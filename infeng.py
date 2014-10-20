@@ -80,7 +80,7 @@ class engine():
                    linalg.det(sigma)>0.0
 
         if eta is None:
-            eta=self.__param[3]
+            eta=self.__param__[3]
         else:
 
             # Check that the shape parameter is

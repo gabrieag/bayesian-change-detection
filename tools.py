@@ -31,7 +31,7 @@ def gendata(m,n,k,l,mu=None,omega=None,sigma=None,eta=None,**arg):
 
     return bound,numpy.concatenate(pred,axis=0),numpy.concatenate(resp,axis=0)
 
-def filterdata(pred,resp,**arg):
+def filterdata(pred,resp,mu=None,omega=None,sigma=None,eta=None,**arg):
 
     k,m=numpy.shape(pred)
     k,n=numpy.shape(resp)
@@ -40,6 +40,9 @@ def filterdata(pred,resp,**arg):
     # of the appropriate size to run
     # the sum-product algorithm.
     eng=engine(m,n,alg='sumprod')
+
+    # Set the hyper-parameters of the model.
+    eng.setparam(mu=mu,omega=omega,sigma=sigma,eta=eta)
 
     # Allocate space for storing
     # the posterior probabilities of
@@ -65,7 +68,7 @@ def filterdata(pred,resp,**arg):
 
     return prob
 
-def segmentdata(pred,resp,**arg):
+def segmentdata(pred,resp,mu=None,omega=None,sigma=None,eta=None,**arg):
 
     k,m=numpy.shape(pred)
     k,n=numpy.shape(resp)
@@ -74,6 +77,9 @@ def segmentdata(pred,resp,**arg):
     # of the appropriate size to run
     # the max-product algorithm.
     eng=engine(m,n,alg='maxprod')
+
+    # Set the hyper-parameters of the model.
+    eng.setparam(mu=mu,omega=omega,sigma=sigma,eta=eta)
 
     # Initialize the engine.
     eng.init()

@@ -1,15 +1,17 @@
 
-import math,numpy
+import dateutil,math,numpy,os
 
-from matplotlib import image,pyplot
+from dateutil import parser
+from matplotlib import dates,image,pyplot
 from numpy import linalg,random
+from os import path
 from scipy import interpolate
 
 from tools import gendata,filterdata,segmentdata,plotprob,plotbound
 
-def simpletest():
+def synthdata():
 
-    """Simple test for the Bayesian change detection model."""
+    """Simple test with synthetic data."""
 
     # Set the size
     # of the problem.
@@ -31,19 +33,18 @@ def simpletest():
 
     rate=float(numseg)/float(numpoint-numseg)
 
-    # Compute the posterior probabilities over the
-    # segmentation hypotheses given the data. Then,
-    # find the most likely segmentation of the sequence.
+    # Compute the posterior probabilities over the segmentation
+    # hypotheses. Then, find the most likely sequence segmentation.
     hypotprob=filterdata(pred,resp,ratefun=rate,maxhypot=20)
     changedet=segmentdata(pred,resp,ratefun=rate,maxhypot=20)
 
     fig,(upperaxes,loweraxes)=pyplot.subplots(2,sharex=True)
     fig.subplots_adjust(hspace=0)
 
-    upperaxes.set_title('Bayesian model-based change detection')
-    upperaxes.set_ylabel('Response data')
-    loweraxes.set_xlabel('Sequence elements')
-    loweraxes.set_ylabel('Hypothesis probabilities')
+    upperaxes.set_title('Synthetic data')
+    upperaxes.set_ylabel('Response')
+    loweraxes.set_xlabel('Sequence number')
+    loweraxes.set_ylabel('Hypothesis probability')
 
     # Plot the response data.
     for i in range(numresp):
@@ -57,7 +58,8 @@ def simpletest():
     upperaxes.autoscale(False)
     loweraxes.autoscale(False)
 
-    # Plot the changes detected by the segmentation algorithm.
+    # Plot the changes detected by
+    # the segmentation algorithm.
     plotbound(upperaxes,changedet,
               filled=True,
               facecolor='y',
@@ -79,7 +81,80 @@ def simpletest():
               color='k',
               linestyle=':')
 
+    fig.canvas.set_window_title('Synthetic data')
+
+    pyplot.show()
+
+def welldata():
+
+    """Nuclear response data collected during the drilling of a well."""
+
+    loc=1.0e5
+    scale=1.0e4
+    rate=1.0e-2
+
+    val=[]
+
+    # Store the absolute path to the file containing the data.
+    abspath=path.realpath(path.join(os.getcwd(),path.dirname(__file__)))
+    abspath=path.join(abspath,'well-data.txt')
+
+    # Read the data.
+    with open(abspath,'r') as file:
+        for line in file:
+            try:
+                val.append(float(line))
+            except:
+                pass
+
+    # Format the data.
+    pred=numpy.ones([len(val),1])
+    resp=numpy.array(val).reshape([len(val),1])
+
+    loc=numpy.array([(loc,)])
+    scale=numpy.array([(scale,)])
+
+    # Compute the posterior probabilities over the segmentation hypotheses
+    # given the data. Then, find the most likely segmentation of the sequence.
+    hypotprob=filterdata(pred,resp,mu=loc,sigma=scale,ratefun=rate,maxhypot=50)
+    changedet=segmentdata(pred,resp,mu=loc,sigma=scale,ratefun=rate,maxhypot=50)
+
+    fig,(upperaxes,loweraxes)=pyplot.subplots(2,sharex=True)
+    fig.subplots_adjust(hspace=0)
+
+    upperaxes.set_title('Drilling data')
+    upperaxes.set_ylabel('Nuclear response')
+    loweraxes.set_xlabel('Measurement number')
+    loweraxes.set_ylabel('Hypothesis probability')
+
+    # Plot the data.
+    upperaxes.plot(numpy.arange(1,len(val)+1),resp[:])
+
+    # Plot the posterior probabilities
+    # of the segmentation hypotheses.
+    plotprob(loweraxes,hypotprob,
+             cmap=pyplot.cm.gray)
+
+    upperaxes.autoscale(False)
+    loweraxes.autoscale(False)
+
+    # Plot the changes detected by
+    # the segmentation algorithm.
+    plotbound(upperaxes,changedet,
+              filled=True,
+              facecolor='y',
+              alpha=0.2,
+              edgecolor='none')
+    plotbound(loweraxes,changedet,
+              filled=True,
+              facecolor='y',
+              alpha=0.2,
+              edgecolor='none')
+
+    fig.canvas.set_window_title('Drilling data')
+
     pyplot.show()
 
 if __name__=='__main__':
-    simpletest()
+    synthdata()
+    welldata()
