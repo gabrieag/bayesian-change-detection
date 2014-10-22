@@ -62,6 +62,10 @@ def filterdata(pred,resp,mu=None,omega=None,sigma=None,eta=None,**arg):
         # given the data, one point at a time.
         eng.update(pred[i,:],resp[i,:],**arg)
 
+        # Limit the number
+        # of hypotheses.
+        eng.trim()
+
         # Update the probabilities.
         for j,alpha in eng.state():
             prob[j,i+1]=alpha
@@ -89,6 +93,10 @@ def segmentdata(pred,resp,mu=None,omega=None,sigma=None,eta=None,**arg):
         # Update the segmentation hypotheses
         # given the data, one point at a time.
         eng.update(pred[i,:],resp[i,:],**arg)
+
+        # Limit the number
+        # of hypotheses.
+        eng.trim()
 
     # Backtrack to find the most likely
     # segmentation of the sequence.

@@ -33,10 +33,11 @@ def synthdata():
 
     rate=float(numseg)/float(numpoint-numseg)
 
-    # Compute the posterior probabilities over the segmentation
-    # hypotheses. Then, find the most likely sequence segmentation.
-    hypotprob=filterdata(pred,resp,ratefun=rate,maxhypot=20)
-    changedet=segmentdata(pred,resp,ratefun=rate,maxhypot=20)
+    # Compute the posterior probabilities of
+    # the segmentation hypotheses. Then, find the
+    # most likely segmentation of the sequence.
+    hypotprob=filterdata(pred,resp,ratefun=rate)
+    changedet=segmentdata(pred,resp,ratefun=rate)
 
     fig,(upperaxes,loweraxes)=pyplot.subplots(2,sharex=True)
     fig.subplots_adjust(hspace=0)
@@ -114,10 +115,10 @@ def welldata():
     loc=numpy.array([(loc,)])
     scale=numpy.array([(scale,)])
 
-    # Compute the posterior probabilities over the segmentation hypotheses
-    # given the data. Then, find the most likely segmentation of the sequence.
-    hypotprob=filterdata(pred,resp,mu=loc,sigma=scale,ratefun=rate,maxhypot=50)
-    changedet=segmentdata(pred,resp,mu=loc,sigma=scale,ratefun=rate,maxhypot=50)
+    # Compute the posterior probabilities of the segmentation
+    # hypotheses. Then, find the most likely sequence segmentation.
+    hypotprob=filterdata(pred,resp,mu=loc,sigma=scale,ratefun=rate)
+    changedet=segmentdata(pred,resp,mu=loc,sigma=scale,ratefun=rate)
 
     fig,(upperaxes,loweraxes)=pyplot.subplots(2,sharex=True)
     fig.subplots_adjust(hspace=0)

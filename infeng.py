@@ -1,10 +1,18 @@
 
-import heapq,math,numpy
+import math,numpy
 
 from numpy import linalg,random
 
 # Import the module-specific class.
 from __util__ import suffstat
+
+def accum(x,y):
+    return max(x,y)+math.log1p(math.exp(-abs(x-y)))
+
+class struct():
+    def __init__(self,**arg):
+        for key,val in arg.items():
+            self.__dict__[key]=val
 
 class engine():
 
@@ -100,7 +108,11 @@ class engine():
 
         # Create the initial hypothesis, which states
         # that the first segment is about to begin.
-        self.__hypot__=[(0.0,0,stat.logconst(),stat,fun)]
+        self.__hypot__=[struct(count=0,
+                               logprob=0.0,
+                               stat=stat,
+                               logconst=stat.logconst(),
+                               featfun=fun)]
 
         if self.__alg__=='maxprod':
 
@@ -136,7 +148,7 @@ class engine():
 
         return resp
 
-    def update(self,pred,resp,featfun=None,ratefun=0.1,maxhypot=10):
+    def update(self,pred,resp,featfun=None,ratefun=0.1):
 
         m,n=self.__size__
 
@@ -152,86 +164,107 @@ class engine():
             rate=float(ratefun)
             ratefun=lambda x:rate
 
-        mode,ind=-numpy.inf,numpy.nan
         loglik=-numpy.inf
+        logmax=-numpy.inf
+        logsum=-numpy.inf
 
-        for i,(logprob,count,logconst,stat,featfun) in enumerate(self.__hypot__):
+        ind=numpy.nan
 
-            # Update the sufficient statistics
-            # for the current hypothesis.
-            stat.update(featfun(pred),resp)
+        for i,hypot in enumerate(self.__hypot__):
 
-            logdens=logconst+k*(0.5*m*n)*math.log(2.0*math.pi)
+            # Update the sufficient statistics.
+            hypot.stat.update(hypot.featfun(pred),resp)
 
-            # Evaluate the log-density of
-            # the predictive distribution.
-            logconst=stat.logconst()
-            logdens=logconst-logdens
+            # Compute the log-normalization constant
+            # of the posterior parameter distribution.
+            logconst=hypot.logconst
+            hypot.logconst=hypot.stat.logconst()
 
-            count+=1
+            # Evaluate the log-density of the predictive distribution.
+            logdens=hypot.logconst-logconst-k*(0.5*m*n)*math.log(2.0*math.pi)
 
-            # Increment the log-likelihood of the data.
-            aux=math.log(ratefun(count))+logdens+logprob
-            loglik=max(loglik,aux)+math.log1p(math.exp(-abs(loglik-aux)))
+            # Increment the counter.
+            hypot.count+=1
 
-            if aux>mode:
-                mode,ind=aux,count
+            aux=math.log(ratefun(hypot.count))+logdens+hypot.logprob
 
-            # Update the log-probability of
-            # the current hypothesis given the data.
-            logprob+=math.log1p(-ratefun(count))+logdens
+            # Accumulate the log-likelihood of the data.
+            loglik=accum(loglik,aux)
 
-            self.__hypot__[i]=logprob,count,logconst,stat,featfun
+            if aux>logmax:
+                logmax,ind=aux,hypot.count
 
-        # The hypotheses have changed, and this may
-        # have broken the invariance of the priority
-        # queue. Make sure to restore it.
-        heapq.heapify(self.__hypot__)
+            # Update the log-probability and accumulate them.
+            hypot.logprob+=math.log1p(-ratefun(hypot.count))+logdens
+            logsum=accum(logsum,hypot.logprob)
 
         if self.__alg__=='maxprod':
 
+            loglik=logmax
+
             # Keep track of the most
             # likely hypotheses.
-            loglik=mode
             self.__ind__.append(ind)
 
         stat=suffstat(*self.__param__)
 
-        # Create a new hypothesis, which states
-        # that the next segment is about to begin.
-        hypot=loglik,0,stat.logconst(),stat,fun
+        # Add a new hypothesis, which states that
+        # the next segment is about to begin.
+        self.__hypot__.append(struct(count=0,
+                                     logprob=loglik,
+                                     stat=stat,
+                                     logconst=stat.logconst(),
+                                     featfun=fun))
 
-        # Insert this new hypothesis into the priority queue.
-        heapq.heappush(self.__hypot__,hypot)
+        logsum=accum(logsum,loglik)
 
-        # Limit the number of hypotheses by
-        # filtering out the least likely ones.
-        for i in range(len(self.__hypot__)-maxhypot):
-            hypot=heapq.heappop(self.__hypot__)
+        # Normalize the hypotheses so that
+        # their probabilities sum to one.
+        for hypot in self.__hypot__:
+            hypot.logprob-=logsum
 
-        # Retrieve the most likely hypothesis.
-        hypot,=heapq.nlargest(1,self.__hypot__)
-        logprob,count,logconst,stat,featfun=hypot
+    def trim(self,minprob=1.0e-6,maxhypot=20):
 
-        # Normalize the hypothesis log-probabilities.
-        aux=logprob+math.log(sum(math.exp(p-logprob) for p,k,c,s,f in self.__hypot__))
-        for i,(logprob,count,logconst,stat,featfun) in enumerate(self.__hypot__):
-            self.__hypot__[i]=logprob-aux,count,logconst,stat,featfun
+        # Sort the hypotheses according to their probability.
+        self.__hypot__.sort(key=lambda x:-x.logprob)
+
+        # Store the indices of likely hypotheses.
+        ind=[i for i,hypot in enumerate(self.__hypot__)
+             if math.exp(hypot.logprob)>minprob]
+
+        ind=ind[:maxhypot]
+
+        if not ind:
+            ind=[0]
+
+        # Trim the hypotheses.
+        self.__hypot__=[self.__hypot__[i] for i in ind]
+
+        logsum=-numpy.inf
+
+        # Normalize the hypotheses so that
+        # their probabilities sum to one.
+        for hypot in self.__hypot__:
+            logsum=accum(logsum,hypot.logprob)
+        for hypot in self.__hypot__:
+            hypot.logprob-=logsum
 
     def segment(self):
 
         k=len(self.__ind__)
 
-        # Retrieve the most likely hypothesis.
-        hypot,=heapq.nlargest(1,self.__hypot__)
-        logprob,count,logconst,stat,featfun=hypot
+        # Find the most likely hypothesis.
+        hypot=max(self.__hypot__,key=lambda x:x.logprob)
+
+        count=hypot.count
 
         # Initialize the
         # segment boundaries.
         segbound=[k]
 
-        # Find the best segmentation
-        # given all the data so far.
+        # Find the best sequence
+        # segmentation given all
+        # the data so far.
         ind=k-1
         while ind>0:
             ind-=count
@@ -242,17 +275,8 @@ class engine():
 
         return segbound
 
-    def state(self,param=False):
+    def state(self):
 
-        if param:
-
-            # Iterate over the segmentation hypotheses, and return
-            # the segment-specific feature functions and parameters.
-            for logprob,count,logconst,stat,featfun in self.__hypot__:
-                yield count,math.exp(logprob),featfun,stat.param()
-
-        else:
-
-            # Iterate over the segmentation hypotheses.
-            for logprob,count,logconst,stat,featfun in self.__hypot__:
-                yield count,math.exp(logprob)
+        # Iterate over the segmentation hypotheses.
+        for hypot in self.__hypot__:
+            yield hypot.count,math.exp(hypot.logprob)
