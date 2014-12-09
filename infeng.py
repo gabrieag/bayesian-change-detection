@@ -275,3 +275,70 @@ class engine():
         # Iterate over the segmentation hypotheses.
         for hypot in self.__hypot__:
             yield hypot.count, math.exp(hypot.logprob)
+
+
+def filterdata(pred, resp, mu=None, omega=None, sigma=None, eta=None, **arg):
+
+    k, m = numpy.shape(pred)
+    k, n = numpy.shape(resp)
+
+    # Create an inference engine of the appropriate size to run the sum-product
+    # algorithm.
+    eng = engine(m, n, alg='sumprod')
+
+    # Set the hyper-parameters of the model.
+    eng.setparam(mu=mu, omega=omega, sigma=sigma, eta=eta)
+
+    # Allocate space for storing the posterior probabilities of the
+    # segmentation hypotheses.
+    prob = numpy.zeros([k + 1, k + 1])
+
+    # Initialize the engine.
+    eng.init()
+
+    # Initialize the probabilities.
+    for j, alpha in eng.state():
+        prob[j, 0] = alpha
+
+    for i in range(k):
+
+        # Update the segmentation hypotheses given the data, one point at a
+        # time.
+        eng.update(pred[i, :], resp[i, :], **arg)
+
+        # Limit the number of hypotheses.
+        eng.trim()
+
+        # Update the probabilities.
+        for j, alpha in eng.state():
+            prob[j, i + 1] = alpha
+
+    return prob
+
+
+def segmentdata(pred, resp, mu=None, omega=None, sigma=None, eta=None, **arg):
+
+    k, m = numpy.shape(pred)
+    k, n = numpy.shape(resp)
+
+    # Create an inference engine of the appropriate size to run the max-product
+    # algorithm.
+    eng = engine(m, n, alg='maxprod')
+
+    # Set the hyper-parameters of the model.
+    eng.setparam(mu=mu, omega=omega, sigma=sigma, eta=eta)
+
+    # Initialize the engine.
+    eng.init()
+
+    for i in range(k):
+
+        # Update the segmentation hypotheses given the data, one point at a
+        # time.
+        eng.update(pred[i, :], resp[i, :], **arg)
+
+        # Limit the number of hypotheses.
+        eng.trim()
+
+    # Backtrack to find the most likely segmentation of the sequence.
+    return eng.segment()
