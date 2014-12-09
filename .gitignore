@@ -1,3 +1,10 @@
+# Ignore python byte code.
+*.pyc
+*~
+
+# Ignore editor configurations.
+.project
+.pydevproject
+
 *.wpr
 *.wpu
-*.pyc
