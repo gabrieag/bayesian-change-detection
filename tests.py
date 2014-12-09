@@ -94,11 +94,11 @@ def welldata():
     scale = 1.0e4
     rate = 1.0e-2
 
-    val=[]
+    val = []
 
     # Store the absolute path to the file containing the data.
     abspath = path.realpath(path.join(os.getcwd(), path.dirname(__file__)))
-    abspath = path.join(abspath,'well-data.txt')
+    abspath = path.join(abspath, 'well-data.txt')
 
     # Read the data.
     with open(abspath, 'r') as file:
@@ -157,6 +157,6 @@ def welldata():
     pyplot.show()
 
 
-if __name__=='__main__':
+if __name__ == '__main__':
     synthdata()
     welldata()

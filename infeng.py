@@ -80,7 +80,7 @@ class engine():
             # Check that the dispersion parameter is a symmetric,
             # positive-definite matrix.
             assert numpy.ndim(sigma) == 2 and \
-                   numpy.shape(sigma) == (n,n) and \
+                   numpy.shape(sigma) == (n, n) and \
                    not numpy.isnan(sigma).any() and \
                    numpy.isfinite(sigma).all() and \
                    numpy.allclose(numpy.transpose(sigma), sigma) and \
@@ -118,11 +118,15 @@ class engine():
             # likely hypotheses.
             self.__ind__ = []
 
-    def sim(self, *pred, featfun=None):
+    def sim(self, *pred):
+
+        # NOTE: The previous definition is invalid in python 2.7:
+        #           def sim(self, *pred, featfun=None):
+        featfun = None
 
         m, n = self.__size__
 
-        fun= featfun if callable(featfun) else lambda x: x
+        fun = featfun if callable(featfun) else lambda x: x
 
         # Generate the gain and noise parameters.
         gain, noise = suffstat(*self.__param__).rand()
@@ -131,7 +135,7 @@ class engine():
 
         fact = linalg.cholesky(noise).transpose()
 
-        # Given a set of predictor data, aenerate a corresponding set of
+        # Given a set of predictor data, generate a corresponding set of
         # response data.
         for pred in pred:
             if numpy.ndim(pred) > 1:
@@ -181,7 +185,7 @@ class engine():
                       k*(0.5*m*n)*math.log(2.0*math.pi)
 
             # Increment the counter.
-            hypot.count + =1
+            hypot.count += 1
 
             aux = math.log(ratefun(hypot.count)) + logdens + hypot.logprob
 
