@@ -104,10 +104,6 @@ class suffstat(object):
         return a, b
 
 
-def accum(x, y):
-    return max(x, y) + math.log1p(math.exp(-abs(x - y)))
-
-
 class struct():
     def __init__(self, **arg):
         for key, val in arg.items():
@@ -244,6 +240,9 @@ class engine():
 
         return resp
 
+    def __accum(self, x, y):
+        return max(x, y) + math.log1p(math.exp(-abs(x - y)))
+
     def update(self, pred, resp, featfun=None, ratefun=0.1):
 
         m, n = self.__size__
@@ -286,14 +285,14 @@ class engine():
             aux = math.log(ratefun(hypot.count)) + logdens + hypot.logprob
 
             # Accumulate the log-likelihood of the data.
-            loglik = accum(loglik, aux)
+            loglik = self.__accum(loglik, aux)
 
             if aux > logmax:
                 logmax, ind = aux, hypot.count
 
             # Update the log-probability and accumulate them.
             hypot.logprob += math.log1p(-ratefun(hypot.count)) + logdens
-            logsum = accum(logsum, hypot.logprob)
+            logsum = self.__accum(logsum, hypot.logprob)
 
         if self.__alg__ == 'maxprod':
 
@@ -312,7 +311,7 @@ class engine():
                                      logconst=stat.logconst(),
                                      featfun=fun))
 
-        logsum = accum(logsum, loglik)
+        logsum = self.__accum(logsum, loglik)
 
         # Normalize the hypotheses so that their probabilities sum to one.
         for hypot in self.__hypot__:
@@ -339,7 +338,7 @@ class engine():
 
         # Normalize the hypotheses so that their probabilities sum to one.
         for hypot in self.__hypot__:
-            logsum = accum(logsum, hypot.logprob)
+            logsum = self.__accum(logsum, hypot.logprob)
         for hypot in self.__hypot__:
             hypot.logprob -= logsum
 
