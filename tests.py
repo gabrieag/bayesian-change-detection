@@ -4,7 +4,7 @@ from os import path
 from matplotlib import pyplot
 
 from numpy import random
-from infeng import engine
+from infeng import Bcdm
 from infeng import filterdata
 from infeng import segmentdata
 
@@ -12,10 +12,7 @@ from infeng import segmentdata
 def gendata(m, n, k, l, mu=None, omega=None, sigma=None, eta=None, **arg):
 
     # Create an inference engine of the appropriate size.
-    eng = engine(m, n)
-
-    # Set the hyper-parameters of the model.
-    eng.setparam(mu=mu, omega=omega, sigma=sigma, eta=eta)
+    eng = Bcdm(m, n, mu=mu, omega=omega, sigma=sigma, eta=eta)
 
     # Generate the segment boundaries.
     bound = random.permutation(numpy.arange(k - 1) + 1)

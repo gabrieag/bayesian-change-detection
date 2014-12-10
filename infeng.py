@@ -12,6 +12,36 @@ class suffstat(object):
         m, n = numpy.shape(mu)
         self.__size__ = m, n
 
+        # Check that the location parameter is a matrix of finite numbers.
+        assert (numpy.ndim(mu) == 2 and
+                numpy.shape(mu) == (m, n) and
+                not numpy.isnan(mu).any() and
+                numpy.isfinite(mu).all())
+
+        # Check that the scale parameter is a symmetric, positive-definite
+        # matrix.
+        assert (numpy.ndim(omega) == 2 and
+                numpy.shape(omega) == (m, m) and
+                not numpy.isnan(omega).any() and
+                numpy.isfinite(omega).all() and
+                numpy.allclose(numpy.transpose(omega), omega) and
+                linalg.det(omega) > 0.0)
+
+        # Check that the dispersion parameter is a symmetric, positive-definite
+        # matrix.
+        assert (numpy.ndim(sigma) == 2 and
+                numpy.shape(sigma) == (n, n) and
+                not numpy.isnan(sigma).any() and
+                numpy.isfinite(sigma).all() and
+                numpy.allclose(numpy.transpose(sigma), sigma) and
+                linalg.det(sigma) > 0.0)
+
+        # Check that the shape parameter is a number greater than one minus the
+        # number of degrees of freedom.
+        assert (numpy.isscalar(eta) and
+                not numpy.isnan(eta) and
+                numpy.isfinite(eta) and eta > n - 1.0)
+
         # Allocate space for storing the matrix of product statistics.
         self.__prod__ = numpy.zeros([m + n, m + n])
 
@@ -74,8 +104,8 @@ class suffstat(object):
 
         # Compute the parameters of the posterior distribution.
         return linalg.solve(s[:m, :m], s[:m, m:]), \
-               numpy.dot(s[:m, :m].transpose(),s[:m, :m]), \
-               numpy.dot(s[m:, m:].transpose(),s[m:, m:]) / w,w
+               numpy.dot(s[:m, :m].transpose(), s[:m, :m]), \
+               numpy.dot(s[m:, m:].transpose(), s[m:, m:]) / w,w
 
     def rand(self):
 
@@ -110,10 +140,11 @@ class struct():
             self.__dict__[key] = val
 
 
-class engine():
-    """Inference engine for the Bayesian change detection model."""
+class Bcdm():
+    """Bayesian change detection model."""
 
-    def __init__(self, m, n, alg='sumprod'):
+    def __init__(self, m, n, mu=None, omega=None, sigma=None, eta=None,
+                 alg='sumprod', featfun=None):
 
         # The number of predictors and responses must be both positive integer
         # scalars.
@@ -126,71 +157,18 @@ class engine():
         self.__alg__ = alg.lower()
 
         # Set default values for the parameters.
-        mu = numpy.zeros([m, n])
-        omega = numpy.eye(m)
-        sigma = numpy.eye(n)
-        eta = n
+        if mu is None:
+            mu = numpy.zeros([m, n])
+        if omega is None:
+            omega = numpy.eye(m)
+        if sigma is None:
+            sigma = numpy.eye(n)
+        if eta is None:
+            eta = n
 
         self.__param__ = mu, omega, sigma, eta
         self.__hypot__ = []
         self.__ind__ = None
-
-    def getparam(self):
-        return self.__param__
-
-    def setparam(self, mu=None, omega=None, sigma=None, eta=None):
-
-        m, n = self.__size__
-
-        if mu is None:
-            mu = self.__param__[0]
-        else:
-
-            # Check that the location parameter is a matrix of finite numbers.
-            assert numpy.ndim(mu) == 2 and \
-                   numpy.shape(mu) == (m, n) and \
-                   not numpy.isnan(mu).any() and \
-                   numpy.isfinite(mu).all()
-
-        if omega is None:
-            omega = self.__param__[1]
-        else:
-
-            # Check that the scale parameter is a symmetric, positive-definite
-            # matrix.
-            assert numpy.ndim(omega) == 2 and \
-                   numpy.shape(omega) == (m, m) and \
-                   not numpy.isnan(omega).any() and \
-                   numpy.isfinite(omega).all() and \
-                   numpy.allclose(numpy.transpose(omega), omega) and \
-                   linalg.det(omega) > 0.0
-
-        if sigma is None:
-            sigma = self.__param__[2]
-        else:
-
-            # Check that the dispersion parameter is a symmetric,
-            # positive-definite matrix.
-            assert numpy.ndim(sigma) == 2 and \
-                   numpy.shape(sigma) == (n, n) and \
-                   not numpy.isnan(sigma).any() and \
-                   numpy.isfinite(sigma).all() and \
-                   numpy.allclose(numpy.transpose(sigma), sigma) and \
-                   linalg.det(sigma) > 0.0
-
-        if eta is None:
-            eta = self.__param__[3]
-        else:
-
-            # Check that the shape parameter is a number greater than one minus
-            # the number of degrees of freedom.
-            assert numpy.isscalar(eta) and \
-                   not numpy.isnan(eta) and \
-                   numpy.isfinite(eta) and eta > n - 1.0
-
-        self.__param__ = mu, omega, sigma, eta
-
-    def init(self, featfun=None):
 
         stat = suffstat(*self.__param__)
 
@@ -379,33 +357,27 @@ def filterdata(pred, resp, mu=None, omega=None, sigma=None, eta=None, **arg):
 
     # Create an inference engine of the appropriate size to run the sum-product
     # algorithm.
-    eng = engine(m, n, alg='sumprod')
-
-    # Set the hyper-parameters of the model.
-    eng.setparam(mu=mu, omega=omega, sigma=sigma, eta=eta)
+    bcdm = Bcdm(m, n, mu=mu, omega=omega, sigma=sigma, eta=eta, alg='sumprod')
 
     # Allocate space for storing the posterior probabilities of the
     # segmentation hypotheses.
     prob = numpy.zeros([k + 1, k + 1])
 
-    # Initialize the engine.
-    eng.init()
-
     # Initialize the probabilities.
-    for j, alpha in eng.state():
+    for j, alpha in bcdm.state():
         prob[j, 0] = alpha
 
     for i in range(k):
 
         # Update the segmentation hypotheses given the data, one point at a
         # time.
-        eng.update(pred[i, :], resp[i, :], **arg)
+        bcdm.update(pred[i, :], resp[i, :], **arg)
 
         # Limit the number of hypotheses.
-        eng.trim()
+        bcdm.trim()
 
         # Update the probabilities.
-        for j, alpha in eng.state():
+        for j, alpha in bcdm.state():
             prob[j, i + 1] = alpha
 
     return prob
@@ -418,22 +390,16 @@ def segmentdata(pred, resp, mu=None, omega=None, sigma=None, eta=None, **arg):
 
     # Create an inference engine of the appropriate size to run the max-product
     # algorithm.
-    eng = engine(m, n, alg='maxprod')
-
-    # Set the hyper-parameters of the model.
-    eng.setparam(mu=mu, omega=omega, sigma=sigma, eta=eta)
-
-    # Initialize the engine.
-    eng.init()
+    bcdm = Bcdm(m, n, mu=mu, omega=omega, sigma=sigma, eta=eta, alg='maxprod')
 
     for i in range(k):
 
         # Update the segmentation hypotheses given the data, one point at a
         # time.
-        eng.update(pred[i, :], resp[i, :], **arg)
+        bcdm.update(pred[i, :], resp[i, :], **arg)
 
         # Limit the number of hypotheses.
-        eng.trim()
+        bcdm.trim()
 
     # Backtrack to find the most likely segmentation of the sequence.
-    return eng.segment()
+    return bcdm.segment()
