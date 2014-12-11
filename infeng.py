@@ -144,7 +144,7 @@ class Bcdm():
     """Bayesian change detection model."""
 
     def __init__(self, m, n, mu=None, omega=None, sigma=None, eta=None,
-                 alg='sumprod', featfun=None):
+                 alg='sumprod', featfun=None, minprob=1.0e-6, maxhypot=20):
 
         # The number of predictors and responses must be both positive integer
         # scalars.
@@ -166,12 +166,16 @@ class Bcdm():
         if eta is None:
             eta = n
 
+        # If 'maxhypot' is set to none, no hypotheses will be trimmed.
+        assert maxhypot > 0 or not None
+        assert minprob > 0
+        self.__maxhypot__ = maxhypot
+        self.__minprob__ = minprob
+
         self.__param__ = mu, omega, sigma, eta
         self.__hypot__ = []
         self.__ind__ = None
-
         stat = suffstat(*self.__param__)
-
         fun = featfun if callable(featfun) else lambda x: x
 
         # Create the initial hypothesis, which states that the first segment is
@@ -295,6 +299,9 @@ class Bcdm():
         for hypot in self.__hypot__:
             hypot.logprob -= logsum
 
+        if self.__maxhypot__ is not None:
+            self.trim(minprob=self.__minprob__, maxhypot=self.__maxhypot__)
+
     def trim(self, minprob=1.0e-6, maxhypot=20):
 
         # Sort the hypotheses according to their probability.
@@ -373,9 +380,6 @@ def filterdata(pred, resp, mu=None, omega=None, sigma=None, eta=None, **arg):
         # time.
         bcdm.update(pred[i, :], resp[i, :], **arg)
 
-        # Limit the number of hypotheses.
-        bcdm.trim()
-
         # Update the probabilities.
         for j, alpha in bcdm.state():
             prob[j, i + 1] = alpha
@@ -397,9 +401,6 @@ def segmentdata(pred, resp, mu=None, omega=None, sigma=None, eta=None, **arg):
         # Update the segmentation hypotheses given the data, one point at a
         # time.
         bcdm.update(pred[i, :], resp[i, :], **arg)
-
-        # Limit the number of hypotheses.
-        bcdm.trim()
 
     # Backtrack to find the most likely segmentation of the sequence.
     return bcdm.segment()
