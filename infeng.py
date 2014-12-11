@@ -343,10 +343,8 @@ class Bcdm():
         ind = k - 1
         while ind > 0:
             ind -= count
-            segbound.append(ind)
+            segbound.insert(0, ind)
             count = self.__ind__[ind - 1]
-
-        segbound.reverse()
 
         return segbound
 
