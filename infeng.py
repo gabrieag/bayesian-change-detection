@@ -55,7 +55,7 @@ class suffstat(object):
         self.__prod__[m:, m:] = numpy.dot(numpy.transpose(mu), x) + eta*sigma
         self.__weight__ = eta
 
-    def update(self, pred, resp):
+    def update(self, X, Y):
 
         m, n = self.__size__
 
@@ -64,28 +64,28 @@ class suffstat(object):
         #     | XX    XY |
         #     |  0    YY |
         #
-        if numpy.ndim(pred) > 1:
+        if numpy.ndim(X) > 1:
 
-            k, m = numpy.shape(pred)
+            k, m = numpy.shape(X)
 
-            x = numpy.dot(numpy.transpose(pred), resp)
+            x = numpy.dot(numpy.transpose(X), Y)
 
             # Update the statistics given a block of data.
-            self.__prod__[:m, :m] += numpy.dot(numpy.transpose(pred), pred)
+            self.__prod__[:m, :m] += numpy.dot(numpy.transpose(X), X)
             self.__prod__[:m, m:] += x
             self.__prod__[m:, :m] += x.transpose()
-            self.__prod__[m:, m:] += numpy.dot(numpy.transpose(resp), resp)
+            self.__prod__[m:, m:] += numpy.dot(numpy.transpose(Y), Y)
             self.__weight__ += k
 
         else:
-            m = numpy.size(pred)
-            x = numpy.outer(pred, resp)
+            m = numpy.size(X)
+            x = numpy.outer(X, Y)
 
             # Update the statistics given a single datum.
-            self.__prod__[:m, :m] += numpy.outer(pred, pred)
+            self.__prod__[:m, :m] += numpy.outer(X, X)
             self.__prod__[:m, m:] += x
             self.__prod__[m:, :m] += x.transpose()
-            self.__prod__[m:, m:] += numpy.outer(resp, resp)
+            self.__prod__[m:, m:] += numpy.outer(Y, Y)
             self.__weight__ += 1
 
     def logconst(self):
@@ -202,10 +202,10 @@ class Bcdm():
             # likely hypotheses.
             self.__ind__ = []
 
-    def sim(self, *pred):
+    def sim(self, *X):
 
         # NOTE: The previous definition is invalid in python 2.7:
-        #           def sim(self, *pred, featfun=None):
+        #           def sim(self, *X, featfun=None):
         featfun = None
 
         m, n = self.__size__
@@ -215,35 +215,35 @@ class Bcdm():
         # Generate the gain and noise parameters.
         gain, noise = suffstat(*self.__param__).rand()
 
-        resp = []
+        Y = []
 
         fact = linalg.cholesky(noise).transpose()
 
         # Given a set of predictor data, generate a corresponding set of
         # response data.
-        for pred in pred:
-            if numpy.ndim(pred) > 1:
-                k, m = numpy.shape(pred)
+        for x in X:
+            if numpy.ndim(x) > 1:
+                k, m = numpy.shape(x)
                 shape = [k, n]
             else:
                 shape = [n]
-            resp.append(fun(numpy.dot(pred, gain))
+            Y.append(fun(numpy.dot(x, gain))
                         + numpy.dot(random.randn(*shape), fact))
 
-        return resp
+        return Y
 
     def __accum(self, x, y):
         return max(x, y) + math.log1p(math.exp(-abs(x - y)))
 
-    def update(self, pred, resp, featfun=None, ratefun=0.1):
+    def update(self, X, Y, featfun=None, ratefun=0.1):
 
         m, n = self.__size__
 
         # Deduce the number of points.
-        if numpy.ndim(pred) > 1:
-            k, _ = numpy.shape(pred)
+        if numpy.ndim(X) > 1:
+            k, _ = numpy.shape(X)
         else:
-            k = numpy.size(pred)
+            k = numpy.size(X)
 
         fun = featfun if callable(featfun) else lambda x: x
 
@@ -260,7 +260,7 @@ class Bcdm():
         for i, hypot in enumerate(self.__hypot__):
 
             # Update the sufficient statistics.
-            hypot.stat.update(hypot.featfun(pred), resp)
+            hypot.stat.update(hypot.featfun(X), Y)
 
             # Compute the log-normalization constant of the posterior parameter
             # distribution.
@@ -368,10 +368,10 @@ class Bcdm():
             yield hypot.count, math.exp(hypot.logprob)
 
 
-def filterdata(pred, resp, mu=None, omega=None, sigma=None, eta=None, **arg):
+def filterdata(X, Y, mu=None, omega=None, sigma=None, eta=None, **arg):
 
-    k, m = numpy.shape(pred)
-    k, n = numpy.shape(resp)
+    k, m = numpy.shape(X)
+    k, n = numpy.shape(Y)
 
     # Create an inference engine of the appropriate size to run the sum-product
     # algorithm.
@@ -389,7 +389,7 @@ def filterdata(pred, resp, mu=None, omega=None, sigma=None, eta=None, **arg):
 
         # Update the segmentation hypotheses given the data, one point at a
         # time.
-        bcdm.update(pred[i, :], resp[i, :], **arg)
+        bcdm.update(X[i, :], Y[i, :], **arg)
 
         # Update the probabilities.
         for j, alpha in bcdm.state():
@@ -398,10 +398,10 @@ def filterdata(pred, resp, mu=None, omega=None, sigma=None, eta=None, **arg):
     return prob
 
 
-def segmentdata(pred, resp, mu=None, omega=None, sigma=None, eta=None, **arg):
+def segmentdata(X, Y, mu=None, omega=None, sigma=None, eta=None, **arg):
 
-    k, m = numpy.shape(pred)
-    k, n = numpy.shape(resp)
+    k, m = numpy.shape(X)
+    k, n = numpy.shape(Y)
 
     # Create an inference engine of the appropriate size to run the max-product
     # algorithm.
@@ -411,7 +411,7 @@ def segmentdata(pred, resp, mu=None, omega=None, sigma=None, eta=None, **arg):
 
         # Update the segmentation hypotheses given the data, one point at a
         # time.
-        bcdm.update(pred[i, :], resp[i, :], **arg)
+        bcdm.update(X[i, :], Y[i, :], **arg)
 
     # Backtrack to find the most likely segmentation of the sequence.
     return bcdm.segment()
