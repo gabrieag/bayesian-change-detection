@@ -59,6 +59,11 @@ class suffstat(object):
 
         m, n = self.__size__
 
+        # (Equation 5a, b)
+        #
+        #     | XX    XY |
+        #     |  0    YY |
+        #
         if numpy.ndim(pred) > 1:
 
             k, m = numpy.shape(pred)
@@ -87,13 +92,18 @@ class suffstat(object):
 
         m, n = self.__size__
 
+        # Note usage of the log-determinant 'trick':
+        #     log(det(A)) = 2*sum(log(diag(chol(A))))
+        #
         d = numpy.diag(linalg.cholesky(self.__prod__))
         w = self.__weight__
 
         # Evaluate the log-normalization constant.
-        return special.gammaln(0.5*(w - numpy.arange(n))).sum() \
-               -n*(0.5*w)*math.log(0.5*w) - n*numpy.log(d[:m]).sum() \
-               -w*numpy.log(d[m:] / math.sqrt(w)).sum()
+        # (Equation 8)
+        return special.gammaln(0.5*(w - numpy.arange(n))).sum() - \
+               n * numpy.log(d[:m]).sum() - \
+               w * numpy.log(d[m:] / math.sqrt(w)).sum() - \
+               n * (0.5 * w) * math.log(0.5 * w)
 
     def param(self):
 
@@ -254,16 +264,19 @@ class Bcdm():
 
             # Compute the log-normalization constant of the posterior parameter
             # distribution.
+            # (Equation 8)
             logconst = hypot.logconst
             hypot.logconst = hypot.stat.logconst()
 
             # Evaluate the log-density of the predictive distribution.
+            # (Equation 16)
             logdens = hypot.logconst - logconst - \
                       k*(0.5*m*n)*math.log(2.0*math.pi)
 
             # Increment the counter.
             hypot.count += 1
 
+            # (Equation 17)
             aux = math.log(ratefun(hypot.count)) + logdens + hypot.logprob
 
             # Accumulate the log-likelihood of the data.
