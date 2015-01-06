@@ -1,385 +1,465 @@
-import math
-import numpy
+import numpy as np
 from numpy import linalg
 from numpy import random
 from scipy import special
 
 
-class suffstat(object):
+class MatrixVariateNormalInvGamma(object):
+    """Matrix-variate normal, inverse-gamma distribution.
+
+    The matrix-variate normal, inverse-gamma distribution is the conjugate
+    prior for a matrix-variate normal distribution. As a result the
+    distribution can be used in Bayesian estimation of the location and scale
+    parameters of the matrix-variate normal distribution.
+
+    """
 
     def __init__(self, mu, omega, sigma, eta):
 
-        m, n = numpy.shape(mu)
-        self.__size__ = m, n
+        # Get size of data.
+        m, n = np.shape(mu)
+        self.__m, self.__n = m, n
 
         # Check that the location parameter is a matrix of finite numbers.
-        assert (numpy.ndim(mu) == 2 and
-                numpy.shape(mu) == (m, n) and
-                not numpy.isnan(mu).any() and
-                numpy.isfinite(mu).all())
+        if not (np.ndim(mu) == 2 and
+                np.shape(mu) == (m, n) and
+                not np.isnan(mu).any() and
+                np.isfinite(mu).all()):
+            msg = 'The location parameter must be a matrix of finite numbers.'
+            raise Exception(msg)
 
         # Check that the scale parameter is a symmetric, positive-definite
         # matrix.
-        assert (numpy.ndim(omega) == 2 and
-                numpy.shape(omega) == (m, m) and
-                not numpy.isnan(omega).any() and
-                numpy.isfinite(omega).all() and
-                numpy.allclose(numpy.transpose(omega), omega) and
-                linalg.det(omega) > 0.0)
+        if not (np.ndim(omega) == 2 and
+                np.shape(omega) == (m, m) and
+                not np.isnan(omega).any() and
+                np.isfinite(omega).all() and
+                np.allclose(np.transpose(omega), omega) and
+                linalg.det(omega) > 0.0):
+            msg = 'The scale parameter must be a symmetric, positive-definite'
+            msg += ' matrix.'
+            raise Exception(msg)
 
         # Check that the dispersion parameter is a symmetric, positive-definite
         # matrix.
-        assert (numpy.ndim(sigma) == 2 and
-                numpy.shape(sigma) == (n, n) and
-                not numpy.isnan(sigma).any() and
-                numpy.isfinite(sigma).all() and
-                numpy.allclose(numpy.transpose(sigma), sigma) and
-                linalg.det(sigma) > 0.0)
+        if not (np.ndim(sigma) == 2 and
+                np.shape(sigma) == (n, n) and
+                not np.isnan(sigma).any() and
+                np.isfinite(sigma).all() and
+                np.allclose(np.transpose(sigma), sigma) and
+                linalg.det(sigma) > 0.0):
+            msg = 'The noise parameter must be a symmetric, positive-definite'
+            msg += ' matrix.'
+            raise Exception(msg)
 
         # Check that the shape parameter is a number greater than one minus the
         # number of degrees of freedom.
-        assert (numpy.isscalar(eta) and
-                not numpy.isnan(eta) and
-                numpy.isfinite(eta) and eta > n - 1.0)
+        if not (np.isscalar(eta) and
+                not np.isnan(eta) and
+                np.isfinite(eta) and eta > n - 1.0):
+            msg = 'The shape parameter must be greater than one minus the'
+            msg += ' degrees of freedom.'
+            raise Exception(msg)
 
         # Allocate space for storing the matrix of product statistics.
-        self.__prod__ = numpy.zeros([m + n, m + n])
-
-        x = numpy.dot(omega, mu)
+        self.__prod = np.zeros([m + n, m + n])
 
         # Initialize the statistics with the parameters of the prior
         # distribution.
-        self.__prod__[:m, :m] = omega
-        self.__prod__[:m, m:] = x
-        self.__prod__[m:, :m] = x.transpose()
-        self.__prod__[m:, m:] = numpy.dot(numpy.transpose(mu), x) + eta*sigma
-        self.__weight__ = eta
+        x = np.dot(omega, mu)
+        self.__prod[:m, :m] = omega
+        self.__prod[:m, m:] = x
+        self.__prod[m:, :m] = x.transpose()
+        self.__prod[m:, m:] = np.dot(np.transpose(mu), x) + eta * sigma
+        self.__weight = eta
 
     def update(self, X, Y):
+        """Update the sufficient statistics given observed data.
 
-        m, n = self.__size__
+        The sufficient statistics represent the only parameters required to
+        describe the shape of the distribution. Due to conjugacy, the
+        sufficient statistics also form the hyper-parameters of the
+        distribution. In a Bayesian context, when the sufficient statistics are
+        referred to as 'hyper-parameters', it implies the sufficient statistics
+        reflect prior information about the distribution. After updating the
+        distribution with observed data, the sufficient statistics refer to the
+        posterior distribution.
+
+        """
 
         # (Equation 5a, b)
         #
         #     | XX    XY |
-        #     |  0    YY |
+        #     | YX    YY |
         #
-        if numpy.ndim(X) > 1:
+        if np.ndim(X) > 1:
+            k, m = np.shape(X)
+            x = np.dot(np.transpose(X), Y)
 
-            k, m = numpy.shape(X)
-
-            x = numpy.dot(numpy.transpose(X), Y)
-
-            # Update the statistics given a block of data.
-            self.__prod__[:m, :m] += numpy.dot(numpy.transpose(X), X)
-            self.__prod__[:m, m:] += x
-            self.__prod__[m:, :m] += x.transpose()
-            self.__prod__[m:, m:] += numpy.dot(numpy.transpose(Y), Y)
-            self.__weight__ += k
+            # Update the statistics given a block of data (in the following
+            # order: XX, XY, YX, YY)
+            self.__prod[:m, :m] += np.dot(np.transpose(X), X)
+            self.__prod[:m, m:] += x
+            self.__prod[m:, :m] += x.transpose()
+            self.__prod[m:, m:] += np.dot(np.transpose(Y), Y)
+            self.__weight += k
 
         else:
-            m = numpy.size(X)
-            x = numpy.outer(X, Y)
+            m = np.size(X)
+            x = np.outer(X, Y)
 
             # Update the statistics given a single datum.
-            self.__prod__[:m, :m] += numpy.outer(X, X)
-            self.__prod__[:m, m:] += x
-            self.__prod__[m:, :m] += x.transpose()
-            self.__prod__[m:, m:] += numpy.outer(Y, Y)
-            self.__weight__ += 1
+            self.__prod[:m, :m] += np.outer(X, X)
+            self.__prod[:m, m:] += x
+            self.__prod[m:, :m] += x.transpose()
+            self.__prod[m:, m:] += np.outer(Y, Y)
+            self.__weight += 1
 
     def logconst(self):
 
-        m, n = self.__size__
+        m, n = self.__m, self.__n
 
         # Note usage of the log-determinant 'trick':
+        #
         #     log(det(A)) = 2*sum(log(diag(chol(A))))
         #
-        d = numpy.diag(linalg.cholesky(self.__prod__))
-        w = self.__weight__
+        d = np.diag(linalg.cholesky(self.__prod))
+        w = self.__weight
 
         # Evaluate the log-normalization constant.
         # (Equation 8)
-        return special.gammaln(0.5*(w - numpy.arange(n))).sum() - \
-               n * numpy.log(d[:m]).sum() - \
-               w * numpy.log(d[m:] / math.sqrt(w)).sum() - \
-               n * (0.5 * w) * math.log(0.5 * w)
+        return special.gammaln(0.5*(w - np.arange(n))).sum() - \
+               n * np.log(d[:m]).sum() - \
+               w * np.log(d[m:] / np.sqrt(w)).sum() - \
+               n * (0.5 * w) * np.log(0.5 * w)
 
     def param(self):
+        """Return parameters of the posterior distribution."""
 
-        m, n = self.__size__
-
-        s = linalg.cholesky(self.__prod__).transpose()
-        w = self.__weight__
+        m = self.__m
+        s = linalg.cholesky(self.__prod).transpose()
+        w = self.__weight
 
         # Compute the parameters of the posterior distribution.
         return linalg.solve(s[:m, :m], s[:m, m:]), \
-               numpy.dot(s[:m, :m].transpose(), s[:m, :m]), \
-               numpy.dot(s[m:, m:].transpose(), s[m:, m:]) / w,w
+               np.dot(s[:m, :m].transpose(), s[:m, :m]), \
+               np.dot(s[m:, m:].transpose(), s[m:, m:]) / w, \
+               w
 
     def rand(self):
 
-        m, n = self.__size__
+        m, n = self.__m, self.__n
 
-        s = linalg.cholesky(self.__prod__).transpose()
-        w = self.__weight__
+        s = linalg.cholesky(self.__prod).transpose()
+        w = self.__weight
 
         # Compute the parameters of the posterior distribution.
         mu = linalg.solve(s[:m, :m], s[:m, m:])
-        omega = numpy.dot(s[:m, :m].transpose(), s[:m, :m])
-        sigma = numpy.dot(s[m:, m:].transpose(), s[m:, m:]) / w
+        omega = np.dot(s[:m, :m].transpose(), s[:m, :m])
+        sigma = np.dot(s[m:, m:].transpose(), s[m:, m:]) / w
         eta = w
 
         # Simulate the marginal Wishart distribution.
-        f = linalg.solve(numpy.diag(numpy.sqrt(2.0*random.gamma(
-            (eta - numpy.arange(n))/2.0))) + numpy.tril(random.randn(n, n), -1),
-                         math.sqrt(eta)*linalg.cholesky(sigma).transpose())
-        b = numpy.dot(f.transpose(), f)
+        f = linalg.solve(np.diag(np.sqrt(2.0*random.gamma(
+            (eta - np.arange(n))/2.0))) + np.tril(random.randn(n, n), -1),
+                         np.sqrt(eta)*linalg.cholesky(sigma).transpose())
+        b = np.dot(f.transpose(), f)
 
         # Simulate the conditional Gauss distribution.
         a = mu + linalg.solve(linalg.cholesky(omega).transpose(),
-                              numpy.dot(random.randn(m, n),
-                                        linalg.cholesky(b).transpose()))
+                              np.dot(random.randn(m, n),
+                                     linalg.cholesky(b).transpose()))
 
         return a, b
-
-
-class struct():
-    def __init__(self, **arg):
-        for key, val in arg.items():
-            self.__dict__[key] = val
 
 
 class Bcdm():
     """Bayesian change detection model."""
 
-    def __init__(self, m, n, mu=None, omega=None, sigma=None, eta=None,
-                 alg='sumprod', featfun=None, minprob=1.0e-6, maxhypot=20):
-
-        # The number of predictors and responses must be both positive integer
-        # scalars.
-        assert m > 0 and n > 0
+    def __init__(self, mu=None, omega=None, sigma=None, eta=None,
+                 alg='sumprod', ratefun=0.1, featfun=None, minprob=1.0e-6,
+                 maxhypot=20):
 
         # The inference algorithm must be either sum-product or max-product.
         assert alg in ['sumprod', 'maxprod']
-
-        self.__size__ = m, n
         self.__alg__ = alg.lower()
 
-        # Set default values for the parameters.
-        if mu is None:
-            mu = numpy.zeros([m, n])
-        if omega is None:
-            omega = numpy.eye(m)
-        if sigma is None:
-            sigma = numpy.eye(n)
-        if eta is None:
-            eta = n
+        # Store number of dimensions in the predictor (independent/input
+        # variable) and response (dependent/output variable) variables.
+        self.__m = None
+        self.__n = None
+
+        self.__mu = None
+        self.__omega = None
+        self.__sigma = None
+        self.__eta = None
+
+        # Set prior for the location parameter.
+        if mu is not None:
+            self.__mu = mu
+
+        # Set prior for the scale parameter.
+        if omega is not None:
+            self.__omega = omega
+
+        # Set prior for the dispersion/noise parameter.
+        if sigma is not None:
+            self.__sigma = sigma
+
+        # Set prior for the shape parameter.
+        if eta is not None:
+            self.__eta = eta
+
+        # Ensure algorithm initialises on first call to update.
+        self.__initialised = False
 
         # If 'maxhypot' is set to none, no hypotheses will be trimmed.
         assert maxhypot > 0 or not None
         assert minprob > 0
-        self.__maxhypot__ = maxhypot
-        self.__minprob__ = minprob
+        self.__maximum_hypotheses = maxhypot
+        self.__minimum_probability = minprob
 
-        self.__param__ = mu, omega, sigma, eta
-        self.__hypot__ = []
-        self.__ind__ = None
-        stat = suffstat(*self.__param__)
-        fun = featfun if callable(featfun) else lambda x: x
+        self.__hypotheses = list()
+        self.__index = list()
+
+        self.__featfun = featfun if callable(featfun) else lambda x: x
+        self.__ratefun = ratefun if callable(ratefun) else lambda x: ratefun
+
+    def __initialise_algorithm(self, m, n):
+
+        # Ensure input dimensions are consistent.
+        if self.__m is None:
+            self.__m = m
+        elif self.__m != m:
+            msg = 'Expected %i dimensions in the predictor variable.' % m
+            raise Exception(msg)
+
+        # Ensure output dimensions are consistent.
+        if self.__n is None:
+            self.__n = n
+        elif self.__n != n:
+            msg = 'Expected %i dimensions in the response variable.' % n
+            raise Exception(msg)
+
+        # Set uninformative prior for the location parameter.
+        if self.__mu is None:
+            self.__mu = np.zeros([m, n])
+
+        # Set uninformative prior for the scale parameter.
+        if self.__omega is None:
+            self.__omega = np.eye(m)
+
+        # Set uninformative prior for the dispersion/noise parameter.
+        if self.__sigma is None:
+            self.__sigma = np.eye(n)
+
+        # Set uninformative prior for the shape parameter.
+        if self.__eta is None:
+            self.__eta = n
+
+        stat = MatrixVariateNormalInvGamma(self.__mu,
+                                           self.__omega,
+                                           self.__sigma,
+                                           self.__eta)
 
         # Create the initial hypothesis, which states that the first segment is
         # about to begin.
-        self.__hypot__ = [struct(count=0,
-                                 logprob=0.0,
-                                 stat=stat,
-                                 logconst=stat.logconst(),
-                                 featfun=fun)]
+        self.__hypotheses = [{'index': 1,
+                              'count': 0,
+                              'log_probability': 0.0,
+                              'distribution': stat,
+                              'log_constant': stat.logconst()}]
 
-        if self.__alg__ == 'maxprod':
+    def sim(self, X, n):
 
-            # The max-product algorithm involves keeping track of the most
-            # likely hypotheses.
-            self.__ind__ = []
-
-    def sim(self, *X):
-
-        # NOTE: The previous definition is invalid in python 2.7:
-        #           def sim(self, *X, featfun=None):
-        featfun = None
-
-        m, n = self.__size__
-
-        fun = featfun if callable(featfun) else lambda x: x
+        # Initialise algorithm on first call to update. This allows the
+        # algorithm to configure itself to the size of the first input/output
+        # data if no hyper-parameters have been specified.
+        if not self.__initialised:
+            m = X[0].shape[1] if np.ndim(X[0]) > 1 else X[0].size
+            self.__initialise_algorithm(m, n)
+            self.__initialised = True
 
         # Generate the gain and noise parameters.
-        gain, noise = suffstat(*self.__param__).rand()
-
-        Y = []
+        gain, noise = MatrixVariateNormalInvGamma(self.__mu,
+                                                  self.__omega,
+                                                  self.__sigma,
+                                                  self.__eta).rand()
 
         fact = linalg.cholesky(noise).transpose()
 
         # Given a set of predictor data, generate a corresponding set of
         # response data.
+        Y = []
         for x in X:
-            if numpy.ndim(x) > 1:
-                k, m = numpy.shape(x)
-                shape = [k, n]
+            if np.ndim(x) > 1:
+                k, m = np.shape(x)
+                shape = [k, self.__n]
             else:
-                shape = [n]
-            Y.append(fun(numpy.dot(x, gain))
-                        + numpy.dot(random.randn(*shape), fact))
+                shape = [self.__n]
+
+            # Append random response data to list of observations.
+            y = self.__featfun(np.dot(x, gain))
+            y += np.dot(random.randn(*shape), fact)
+            Y.append(y)
 
         return Y
 
     def __accum(self, x, y):
-        return max(x, y) + math.log1p(math.exp(-abs(x - y)))
+        return max(x, y) + np.log1p(np.exp(-abs(x - y)))
 
-    def update(self, X, Y, featfun=None, ratefun=0.1):
+    def update(self, X, Y):
 
-        m, n = self.__size__
+        # Initialise algorithm on first call to update. This allows the
+        # algorithm to configure itself to the size of the first input/output
+        # data if no hyper-parameters have been specified.
+        if not self.__initialised:
+            m = X.shape[1] if np.ndim(X) > 1 else X.size
+            n = Y.shape[1] if np.ndim(Y) > 1 else Y.size
+            self.__initialise_algorithm(m, n)
+            self.__initialised = True
 
-        # Deduce the number of points.
-        if numpy.ndim(X) > 1:
-            k, _ = numpy.shape(X)
-        else:
-            k = numpy.size(X)
+        # Get size of data.
+        k = X.shape[0] if np.ndim(X) > 1 else X.size
+        m, n = self.__m, self.__n
 
-        fun = featfun if callable(featfun) else lambda x: x
+        loglik = -np.inf
+        logmax = -np.inf
+        logsum = -np.inf
+        ind = np.nan
 
-        if not callable(ratefun):
-            rate = float(ratefun)
-            ratefun = lambda x: rate
-
-        loglik = -numpy.inf
-        logmax = -numpy.inf
-        logsum = -numpy.inf
-
-        ind = numpy.nan
-
-        for i, hypot in enumerate(self.__hypot__):
+        for hypotheses in self.__hypotheses:
 
             # Update the sufficient statistics.
-            hypot.stat.update(hypot.featfun(X), Y)
+            hypotheses['distribution'].update(self.__featfun(X), Y)
 
-            # Compute the log-normalization constant of the posterior parameter
-            # distribution.
+            # Compute the log-normalization constant after the update
+            # (posterior parameter distribution).
             # (Equation 8)
-            logconst = hypot.logconst
-            hypot.logconst = hypot.stat.logconst()
+            n_o = hypotheses['log_constant']
+            n_k = hypotheses['log_constant'] = hypotheses['distribution'].logconst()
 
             # Evaluate the log-density of the predictive distribution.
             # (Equation 16)
-            logdens = hypot.logconst - logconst - \
-                      k*(0.5*m*n)*math.log(2.0*math.pi)
+            log_density = n_k - n_o - k * (0.5 * m * n) * np.log(2.0 * np.pi)
 
             # Increment the counter.
-            hypot.count += 1
-
-            # (Equation 17)
-            aux = math.log(ratefun(hypot.count)) + logdens + hypot.logprob
+            hypotheses['count'] += 1
 
             # Accumulate the log-likelihood of the data.
+            # (Equation 17)
+            hazard = self.__ratefun(hypotheses['count'])
+            aux = np.log(hazard) + log_density + hypotheses['log_probability']
             loglik = self.__accum(loglik, aux)
 
+            # Keep track of the highest, log-likelihood.
             if aux > logmax:
-                logmax, ind = aux, hypot.count
+                logmax, ind = aux, hypotheses['count']
 
-            # Update the log-probability and accumulate them.
-            hypot.logprob += math.log1p(-ratefun(hypot.count)) + logdens
-            logsum = self.__accum(logsum, hypot.logprob)
+            # Update and accumulate the log-probabilities.
+            hypotheses['log_probability'] += np.log1p(-hazard) + log_density
+            logsum = self.__accum(logsum, hypotheses['log_probability'])
 
+        # Keep track of the most likely hypotheses.
         if self.__alg__ == 'maxprod':
-
             loglik = logmax
+            self.__index.append(ind)
 
-            # Keep track of the most likely hypotheses.
-            self.__ind__.append(ind)
-
-        stat = suffstat(*self.__param__)
+        stat = MatrixVariateNormalInvGamma(self.__mu,
+                                           self.__omega,
+                                           self.__sigma,
+                                           self.__eta)
 
         # Add a new hypothesis, which states that the next segment is about to
         # begin.
-        self.__hypot__.append(struct(count=0,
-                                     logprob=loglik,
-                                     stat=stat,
-                                     logconst=stat.logconst(),
-                                     featfun=fun))
+        self.__hypotheses.append({'index': len(self.__hypotheses) + 1,
+                                  'count': 0,
+                                  'log_probability': loglik,
+                                  'distribution': stat,
+                                  'log_constant': stat.logconst()})
 
         logsum = self.__accum(logsum, loglik)
+        self.logsum = logsum
 
         # Normalize the hypotheses so that their probabilities sum to one.
-        for hypot in self.__hypot__:
-            hypot.logprob -= logsum
+        for hypot in self.__hypotheses:
+            hypot['log_probability'] -= logsum
 
-        if self.__maxhypot__ is not None:
-            self.trim(minprob=self.__minprob__, maxhypot=self.__maxhypot__)
+        # Automatically trim hypothesis on each update if requested.
+        if self.__maximum_hypotheses is not None:
+            self.trim(minprob=self.__minimum_probability,
+                      maxhypot=self.__maximum_hypotheses)
 
     def trim(self, minprob=1.0e-6, maxhypot=20):
 
-        # Sort the hypotheses according to their probability.
-        self.__hypot__.sort(key=lambda x: -x.logprob)
+        if len(self.__hypotheses) <= maxhypot:
+            return
+
+        # Sort the hypotheses in decreasing log probability order.
+        self.__hypotheses.sort(key=lambda dct: -dct['log_probability'])
 
         # Store the indices of likely hypotheses.
-        ind = [i for i, hypot in enumerate(self.__hypot__)
-               if math.exp(hypot.logprob) > minprob]
-
-        ind = ind[:maxhypot]
-
-        if not ind:
-            ind = [0]
+        minprob = np.log(minprob)
+        index = [i for i, hypot in enumerate(self.__hypotheses)
+                 if hypot['log_probability'] > minprob]
 
         # Trim the hypotheses.
-        self.__hypot__ = [self.__hypot__[i] for i in ind]
+        index = index[:maxhypot] if len(index) >= maxhypot else index
+        self.__hypotheses = [self.__hypotheses[i] for i in index]
 
-        logsum = -numpy.inf
+        # NOTE: This final ordering can preserve the original order of the
+        #       hypotheses. Interestingly, the algorithm specified in update
+        #       does not require that the hypotheses be ordered! This sort can
+        #       safely be ignored.
+        # self.__hypotheses.sort(key=lambda dct: dct['index'])
 
         # Normalize the hypotheses so that their probabilities sum to one.
-        for hypot in self.__hypot__:
-            logsum = self.__accum(logsum, hypot.logprob)
-        for hypot in self.__hypot__:
-            hypot.logprob -= logsum
+        logsum = -np.inf
+        for hypot in self.__hypotheses:
+            logsum = self.__accum(logsum, hypot['log_probability'])
+        for hypot in self.__hypotheses:
+            hypot['log_probability'] -= logsum
 
     def segment(self):
 
-        k = len(self.__ind__)
+        k = len(self.__index)
 
         # Find the most likely hypothesis.
-        hypot = max(self.__hypot__, key=lambda x: x.logprob)
+        hypot = max(self.__hypotheses, key=lambda dct: dct['log_probability'])
 
-        count = hypot.count
+        count = hypot['count'] - 1
 
         # Initialize the segment boundaries.
-        segbound = [k]
+        segbound = [k - 1]
 
         # Find the best sequence segmentation given all the data so far.
-        ind = k - 1
-        while ind > 0:
-            ind -= count
-            segbound.insert(0, ind)
-            count = self.__ind__[ind - 1]
+        index = k - 1
+        while index > 0:
+            index -= count
+            segbound.insert(0, index)
+            count = self.__index[index - 1]
 
         return segbound
 
     def state(self):
 
         # Iterate over the segmentation hypotheses.
-        for hypot in self.__hypot__:
-            yield hypot.count, math.exp(hypot.logprob)
+        for hypot in self.__hypotheses:
+            yield hypot['count'], np.exp(hypot['log_probability'])
 
 
-def filterdata(X, Y, mu=None, omega=None, sigma=None, eta=None, **arg):
+def filterdata(X, Y, mu=None, omega=None, sigma=None, eta=None, ratefun=0.1):
 
-    k, m = numpy.shape(X)
-    k, n = numpy.shape(Y)
+    k = X.shape[0]
 
     # Create an inference engine of the appropriate size to run the sum-product
     # algorithm.
-    bcdm = Bcdm(m, n, mu=mu, omega=omega, sigma=sigma, eta=eta, alg='sumprod')
+    bcdm = Bcdm(mu=mu, omega=omega, sigma=sigma, eta=eta, alg='sumprod',
+                ratefun=ratefun)
 
     # Allocate space for storing the posterior probabilities of the
     # segmentation hypotheses.
-    prob = numpy.zeros([k + 1, k + 1])
+    prob = np.zeros([k + 1, k + 1])
 
     # Initialize the probabilities.
     for j, alpha in bcdm.state():
@@ -389,7 +469,7 @@ def filterdata(X, Y, mu=None, omega=None, sigma=None, eta=None, **arg):
 
         # Update the segmentation hypotheses given the data, one point at a
         # time.
-        bcdm.update(X[i, :], Y[i, :], **arg)
+        bcdm.update(X[i, :], Y[i, :])
 
         # Update the probabilities.
         for j, alpha in bcdm.state():
@@ -398,20 +478,19 @@ def filterdata(X, Y, mu=None, omega=None, sigma=None, eta=None, **arg):
     return prob
 
 
-def segmentdata(X, Y, mu=None, omega=None, sigma=None, eta=None, **arg):
-
-    k, m = numpy.shape(X)
-    k, n = numpy.shape(Y)
+def segmentdata(X, Y, mu=None, omega=None, sigma=None, eta=None, ratefun=0.1):
 
     # Create an inference engine of the appropriate size to run the max-product
     # algorithm.
-    bcdm = Bcdm(m, n, mu=mu, omega=omega, sigma=sigma, eta=eta, alg='maxprod')
+    bcdm = Bcdm(mu=mu, omega=omega, sigma=sigma, eta=eta, alg='maxprod',
+                ratefun=ratefun)
 
+    k = X.shape[0]
     for i in range(k):
 
         # Update the segmentation hypotheses given the data, one point at a
         # time.
-        bcdm.update(X[i, :], Y[i, :], **arg)
+        bcdm.update(X[i, :], Y[i, :])
 
     # Backtrack to find the most likely segmentation of the sequence.
     return bcdm.segment()

@@ -1,3 +1,4 @@
+#!/usr/bin/python
 import os
 import numpy
 from os import path
@@ -12,7 +13,7 @@ from infeng import segmentdata
 def gendata(m, n, k, l, mu=None, omega=None, sigma=None, eta=None, **arg):
 
     # Create an inference engine of the appropriate size.
-    eng = Bcdm(m, n, mu=mu, omega=omega, sigma=sigma, eta=eta)
+    bcdm = Bcdm(mu=mu, omega=omega, sigma=sigma, eta=eta)
 
     # Generate the segment boundaries.
     bound = random.permutation(numpy.arange(k - 1) + 1)
@@ -20,16 +21,14 @@ def gendata(m, n, k, l, mu=None, omega=None, sigma=None, eta=None, **arg):
                                numpy.sort(bound[:l-1]),
                                numpy.array([k])])
 
-    pred, resp = [], []
-
     # For each segment generate a set of predictor-response data.
+    X, Y = [], []
     for k, (i, j) in enumerate(zip(bound[:-1], bound[1:])):
-        pred.append(random.rand(j - i, m))
-        resp.append(numpy.concatenate(eng.sim(
-            *numpy.split(pred[k], j - i, axis=0)), axis=0))
+        X.append(random.rand(j - i, m))
+        Y.append(numpy.concatenate(bcdm.sim(numpy.split(X[k], j - i, axis=0), n),
+                                   axis=0))
 
-    return bound, numpy.concatenate(pred, axis=0), \
-           numpy.concatenate(resp, axis=0)
+    return bound, numpy.concatenate(X, axis=0), numpy.concatenate(Y, axis=0)
 
 
 def plotprob(axes, prob, scale=None, **arg):
@@ -65,7 +64,7 @@ def plotbound(axes, bound, scale=None, filled=False, **arg):
         for i in range(0, len(bound) - 1, 2):
             x += [scale(bound[i] + 0.5),
                   scale(bound[i + 1] + 0.5),
-                  scale(bound[i + 1]+0.5),
+                  scale(bound[i + 1] + 0.5),
                   scale(bound[i] + 0.5),
                   numpy.nan]
             y += [lower, lower, upper, upper, numpy.nan]
@@ -109,16 +108,16 @@ def synthdata():
 
     # Generate a sequence of segments and, for each segment, generate a set of
     # predictor-response data.
-    segbound, pred, resp = gendata(numpred, numresp, numpoint, numseg,
-                                   omega=gainparam*numpy.eye(numpred),
-                                   eta=noiseparam)
+    segbound, X, Y = gendata(numpred, numresp, numpoint, numseg,
+                             omega=gainparam*numpy.eye(numpred),
+                             eta=noiseparam)
 
     rate = float(numseg) / float(numpoint - numseg)
 
     # Compute the posterior probabilities of the segmentation hypotheses. Then,
     # find the most likely segmentation of the sequence.
-    hypotprob = filterdata(pred, resp, ratefun=rate)
-    changedet = segmentdata(pred, resp, ratefun=rate)
+    hypotprob = filterdata(X, Y, ratefun=rate)
+    changedet = segmentdata(X, Y, ratefun=rate)
 
     fig, (upperaxes, loweraxes) = pyplot.subplots(2, sharex=True)
     fig.subplots_adjust(hspace=0)
@@ -130,7 +129,7 @@ def synthdata():
 
     # Plot the response data.
     for i in range(numresp):
-        upperaxes.plot(numpy.arange(1, numpoint + 1), resp[:, i])
+        upperaxes.plot(numpy.arange(1, numpoint + 1), Y[:, i])
 
     # Plot the posterior probabilities of the segmentation hypotheses.
     plotprob(loweraxes, hypotprob, cmap=pyplot.cm.gray)
@@ -194,16 +193,16 @@ def welldata():
                 pass
 
     # Format the data.
-    pred = numpy.ones([len(val), 1])
-    resp = numpy.array(val).reshape([len(val), 1])
+    X = numpy.ones([len(val), 1])
+    Y = numpy.array(val).reshape([len(val), 1])
 
     loc = numpy.array([(loc, )])
     scale = numpy.array([(scale, )])
 
     # Compute the posterior probabilities of the segmentation hypotheses. Then,
     # find the most likely sequence segmentation.
-    hypotprob = filterdata(pred, resp, mu=loc, sigma=scale, ratefun=rate)
-    changedet = segmentdata(pred, resp, mu=loc, sigma=scale, ratefun=rate)
+    hypotprob = filterdata(X, Y, mu=loc, sigma=scale, ratefun=rate)
+    changedet = segmentdata(X, Y, mu=loc, sigma=scale, ratefun=rate)
 
     fig, (upperaxes, loweraxes) = pyplot.subplots(2, sharex=True)
     fig.subplots_adjust(hspace=0)
@@ -214,7 +213,7 @@ def welldata():
     loweraxes.set_ylabel('Hypothesis probability')
 
     # Plot the data.
-    upperaxes.plot(numpy.arange(1, len(val) + 1), resp[:])
+    upperaxes.plot(numpy.arange(1, len(val) + 1), Y[:])
 
     # Plot the posterior probabilities of the segmentation hypotheses.
     plotprob(loweraxes, hypotprob, cmap=pyplot.cm.gray)
