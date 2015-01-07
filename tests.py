@@ -13,8 +13,8 @@ from numpy import random
 from numpy import linalg
 import matplotlib.pyplot as plt
 
-from infeng import Bcdm
-from infeng import MatrixVariateNormalInvGamma
+from segmentation import Bcdm
+from segmentation import MatrixVariateNormalInvGamma
 
 
 def random_segments(m, n, k, l, mu=None, omega=None, sigma=None, eta=None,
