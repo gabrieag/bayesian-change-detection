@@ -1,44 +1,77 @@
 #!/usr/bin/python
 import os
-import numpy
+import numpy as np
 from os import path
 from matplotlib import pyplot
 
 from numpy import random
-from infeng import Bcdm
+from numpy import linalg
 from infeng import filterdata
 from infeng import segmentdata
+from infeng import MatrixVariateNormalInvGamma
 
 
-def gendata(m, n, k, l, mu=None, omega=None, sigma=None, eta=None, **arg):
+def gendata(m, n, k, l, mu=None, omega=None, sigma=None, eta=None,
+            featfun=None):
 
-    # Create an inference engine of the appropriate size.
-    bcdm = Bcdm(mu=mu, omega=omega, sigma=sigma, eta=eta)
+    # Set uninformative prior for the location parameter.
+    if mu is None:
+        mu = np.zeros([m, n])
+
+    # Set uninformative prior for the scale parameter.
+    if omega is None:
+        omega = np.eye(m)
+
+    # Set uninformative prior for the dispersion/noise parameter.
+    if sigma is None:
+        sigma = np.eye(n)
+
+    # Set uninformative prior for the shape parameter.
+    if eta is None:
+        eta = n
+
+    featfun = featfun if callable(featfun) else lambda x: x
 
     # Generate the segment boundaries.
-    bound = random.permutation(numpy.arange(k - 1) + 1)
-    bound = numpy.concatenate([numpy.array([0]),
-                               numpy.sort(bound[:l-1]),
-                               numpy.array([k])])
+    bound = random.permutation(np.arange(k - 1) + 1)
+    bound = np.concatenate([np.array([0]),
+                            np.sort(bound[:l-1]),
+                            np.array([k])])
 
     # For each segment generate a set of predictor-response data.
-    X, Y = [], []
-    for k, (i, j) in enumerate(zip(bound[:-1], bound[1:])):
-        X.append(random.rand(j - i, m))
-        Y.append(numpy.concatenate(bcdm.sim(numpy.split(X[k], j - i, axis=0), n),
-                                   axis=0))
+    X, Y = list(), list()
+    for i in range(len(bound) - 1):
 
-    return bound, numpy.concatenate(X, axis=0), numpy.concatenate(Y, axis=0)
+        # Generate random predictor (input) data and pre-allocate memory for
+        # response (output) data.
+        k = bound[i + 1] - bound[i]
+        x = random.rand(k, m)
+        y = np.zeros((k, n))
+
+        # Generate the gain and noise parameters.
+        gain, noise = MatrixVariateNormalInvGamma(mu, omega, sigma, eta).rand()
+        fact = linalg.cholesky(noise).transpose()
+
+        # Given a set of predictor data, generate a corresponding set of
+        # response data.
+        for j in range(k):
+            y[j, :] = featfun(np.dot(x[j, :], gain))
+            y[j, :] += np.dot(random.randn(n), fact)
+
+        X.append(x)
+        Y.append(y)
+
+    return bound, np.concatenate(X, axis=0), np.concatenate(Y, axis=0)
 
 
 def plotprob(axes, prob, scale=None, **arg):
 
-    k = max(numpy.shape(prob)) - 1
+    k = max(np.shape(prob)) - 1
 
     if scale is None:
         scale = lambda x: x
 
-    ind, = numpy.nonzero(prob.max(axis=1) > 0)
+    ind, = np.nonzero(prob.max(axis=1) > 0)
     j = ind.max()
 
     # Plot the posterior probabilities of the segmentation hypotheses.
@@ -66,8 +99,8 @@ def plotbound(axes, bound, scale=None, filled=False, **arg):
                   scale(bound[i + 1] + 0.5),
                   scale(bound[i + 1] + 0.5),
                   scale(bound[i] + 0.5),
-                  numpy.nan]
-            y += [lower, lower, upper, upper, numpy.nan]
+                  np.nan]
+            y += [lower, lower, upper, upper, np.nan]
 
         x.pop()
         y.pop()
@@ -82,9 +115,9 @@ def plotbound(axes, bound, scale=None, filled=False, **arg):
         for i in range(1, len(bound) - 1):
             x += [scale(bound[i] + 0.5),
                   scale(bound[i] + 0.5),
-                  numpy.nan]
+                  np.nan]
 
-            y += [lower, upper, numpy.nan]
+            y += [lower, upper, np.nan]
 
         x.pop()
         y.pop()
@@ -93,7 +126,7 @@ def plotbound(axes, bound, scale=None, filled=False, **arg):
         axes.plot(x, y, **arg)
 
 
-def synthdata():
+def synthetic_data():
     """Simple test with synthetic data."""
 
     # Set the size of the problem.
@@ -109,7 +142,7 @@ def synthdata():
     # Generate a sequence of segments and, for each segment, generate a set of
     # predictor-response data.
     segbound, X, Y = gendata(numpred, numresp, numpoint, numseg,
-                             omega=gainparam*numpy.eye(numpred),
+                             omega=gainparam*np.eye(numpred),
                              eta=noiseparam)
 
     rate = float(numseg) / float(numpoint - numseg)
@@ -129,7 +162,7 @@ def synthdata():
 
     # Plot the response data.
     for i in range(numresp):
-        upperaxes.plot(numpy.arange(1, numpoint + 1), Y[:, i])
+        upperaxes.plot(np.arange(1, numpoint + 1), Y[:, i])
 
     # Plot the posterior probabilities of the segmentation hypotheses.
     plotprob(loweraxes, hypotprob, cmap=pyplot.cm.gray)
@@ -171,7 +204,7 @@ def synthdata():
     pyplot.show()
 
 
-def welldata():
+def well_data():
     """Nuclear response data collected during the drilling of a well."""
 
     loc = 1.0e5
@@ -193,11 +226,11 @@ def welldata():
                 pass
 
     # Format the data.
-    X = numpy.ones([len(val), 1])
-    Y = numpy.array(val).reshape([len(val), 1])
+    X = np.ones([len(val), 1])
+    Y = np.array(val).reshape([len(val), 1])
 
-    loc = numpy.array([(loc, )])
-    scale = numpy.array([(scale, )])
+    loc = np.array([(loc, )])
+    scale = np.array([(scale, )])
 
     # Compute the posterior probabilities of the segmentation hypotheses. Then,
     # find the most likely sequence segmentation.
@@ -213,7 +246,7 @@ def welldata():
     loweraxes.set_ylabel('Hypothesis probability')
 
     # Plot the data.
-    upperaxes.plot(numpy.arange(1, len(val) + 1), Y[:])
+    upperaxes.plot(np.arange(1, len(val) + 1), Y[:])
 
     # Plot the posterior probabilities of the segmentation hypotheses.
     plotprob(loweraxes, hypotprob, cmap=pyplot.cm.gray)
@@ -242,5 +275,5 @@ def welldata():
 
 
 if __name__ == '__main__':
-    synthdata()
-    welldata()
+    synthetic_data()
+    # well_data()

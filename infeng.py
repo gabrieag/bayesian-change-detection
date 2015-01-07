@@ -270,41 +270,6 @@ class Bcdm():
                               'distribution': stat,
                               'log_constant': stat.logconst()}]
 
-    def sim(self, X, n):
-
-        # Initialise algorithm on first call to update. This allows the
-        # algorithm to configure itself to the size of the first input/output
-        # data if no hyper-parameters have been specified.
-        if not self.__initialised:
-            m = X[0].shape[1] if np.ndim(X[0]) > 1 else X[0].size
-            self.__initialise_algorithm(m, n)
-            self.__initialised = True
-
-        # Generate the gain and noise parameters.
-        gain, noise = MatrixVariateNormalInvGamma(self.__mu,
-                                                  self.__omega,
-                                                  self.__sigma,
-                                                  self.__eta).rand()
-
-        fact = linalg.cholesky(noise).transpose()
-
-        # Given a set of predictor data, generate a corresponding set of
-        # response data.
-        Y = []
-        for x in X:
-            if np.ndim(x) > 1:
-                k, m = np.shape(x)
-                shape = [k, self.__n]
-            else:
-                shape = [self.__n]
-
-            # Append random response data to list of observations.
-            y = self.__featfun(np.dot(x, gain))
-            y += np.dot(random.randn(*shape), fact)
-            Y.append(y)
-
-        return Y
-
     def __accum(self, x, y):
         return max(x, y) + np.log1p(np.exp(-abs(x - y)))
 
