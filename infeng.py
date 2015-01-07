@@ -1,3 +1,21 @@
+"""Segment time sequence data.
+
+The Bayesian change-point detection model (BCDM) class implements a recursive
+algorithm for partitioning a sequence of real-valued input-output data into
+non-overlapping segments. The segment boundaries are chosen under the
+assumption that, within each segment, the data follow a multi-variate linear
+model.
+
+Segmentation is carried out in an online fashion by recursively updating a set
+of hypotheses. The hypotheses capture the belief about the current segment,
+e.g. its duration and the linear relationship between inputs and outputs, given
+all the data so far. Each time a new pair of data is received, the hypotheses
+are propagated and re-weighted to reflect this new knowledge.
+
+.. codeauthor:: Gabriel Agamennoni <abriel.agamennoni@mavt.ethz.ch>
+.. codeauthor:: Asher Bender <a.bender@acfr.usyd.edu.au>
+
+"""
 import numpy as np
 from numpy import linalg
 from numpy import random
@@ -174,21 +192,67 @@ class MatrixVariateNormalInvGamma(object):
 
 
 class Bcdm():
-    """Bayesian change detection model."""
+    """Bayesian change detection model.
+
+    Args:
+        mu (numpy.array): (M x N) location hyper-parameter used when matrix
+                          variate, normal inverse gamma distributions are
+                          initialised during segmentation.
+        omega (numpy.array): (M x M) scale hyper-parameter used when matrix
+                             variate, normal inverse gamma distributions are
+                             initialised during segmentation.
+        sigma (numpy.array): (N x N) dispersion hyper-parameter used when
+                             matrix variate, normal inverse gamma distributions
+                             are initialised during segmentation.
+        eta (float): shape hyper-parameter used when matrix variate, normal
+                     inverse gamma distributions are initialised during
+                     segmentation.
+        alg (string): Specifies the algorithm to use. Choose either 'sumprod'
+                      for the sum-product algorithm or 'maxprod' for the
+                      max-product algorithm. If the sum-product algorithm is
+                      selected, the posterior probabilities of the segmentation
+                      hypotheses will be calculated. If the max-product
+                      algorithm is selected, the most likely sequence
+                      segmentation will be calculated.
+        ratefun (float): Relative chance of a new segments being
+                         generated. ``ratefun`` is a value between 0 and
+                         1. Segments are MORE likely to be created with values
+                         closer to zero. Segments are LESS likely to form with
+                         values closer to 1. Alternatively, ratefun can be set
+                         to an executable hazard function.
+        minprob (float): Minimum probability required for a
+                         hypothesis. Hypotheses with insignificant support
+                         (probabilities below this value) will be pruned.
+        maxhypot (int): Maximum number of segmentation hypotheses to
+                        consider. After each update, pruning will take place to
+                        limit the number of hypotheses. If set to ``None``, no
+                        pruning will NOT take place after updates, however,
+                        pruning can be initiated manually by calling
+                        :py:meth:`.trim`.
+
+    Raises:
+        Exception: If the any of the inputs are an incorrect type.
+
+    """
 
     def __init__(self, mu=None, omega=None, sigma=None, eta=None,
                  alg='sumprod', ratefun=0.1, featfun=None, minprob=1.0e-6,
                  maxhypot=20):
 
         # The inference algorithm must be either sum-product or sum-product.
-        assert alg in ['sumprod', 'maxprod']
-        self.__alg__ = alg.lower()
+        if alg.lower() not in ['sumprod', 'maxprod']:
+            msg = "The input 'alg' must be either 'sumprod' or 'maxprod'."
+            raise Exception(msg)
+        else:
+            self.__alg__ = alg.lower()
 
         # Store number of dimensions in the predictor (independent/input
         # variable) and response (dependent/output variable) variables.
         self.__m = None
         self.__n = None
 
+        # Allocate variables for matrix variate, normal inverse gamma
+        # distributions.
         self.__mu = None
         self.__omega = None
         self.__sigma = None
@@ -214,11 +278,19 @@ class Bcdm():
         self.__initialised = False
 
         # If 'maxhypot' is set to none, no hypotheses will be trimmed.
-        assert maxhypot > 0 or not None
-        assert minprob > 0
-        self.__maximum_hypotheses = maxhypot
-        self.__minimum_probability = minprob
+        if maxhypot > 0 or not None:
+            self.__maximum_hypotheses = maxhypot
+        else:
+            msg = "The input 'maxhypot' must be an integer greater than zero."
+            raise Exception(msg)
 
+        if minprob > 0:
+            self.__minimum_probability = minprob
+        else:
+            msg = "The input 'minprob' must be a float greater than zero."
+            raise Exception(msg)
+
+        # Allocate variables for tracking segments.
         self.__hypotheses = list()
         self.__index = list()
         self.__probabilities = list()
@@ -227,6 +299,7 @@ class Bcdm():
         self.__ratefun = ratefun if callable(ratefun) else lambda x: ratefun
 
     def __initialise_algorithm(self, m, n):
+        """Initialise the Bcdm algorithm."""
 
         # Ensure input dimensions are consistent.
         if self.__m is None:
@@ -276,11 +349,38 @@ class Bcdm():
         return max(x, y) + np.log1p(np.exp(-abs(x - y)))
 
     def block_update(self, X, Y):
+        """Update model with multiple observations.
 
+        This method is a convenience method for updating the model when many
+        new input-output data are available. This method simply iterates over
+        the inputs calling :py:meth:`.update`.
+
+        Args:
+            X (numpy.array): Observed (K x M) input data (predictor variable).
+            Y (numpy.array): Observed (K x N) output data (response variable).
+
+        """
+
+        # Iterate through the rows of the input-output data updating the
+        # hypotheses in the model.
         for i in range(X.shape[0]):
             self.update(X[i, :], Y[i, :])
 
     def update(self, X, Y):
+        """Update model with a single observation.
+
+        When new input-output data is available, the model can be updated using
+        this method. As more and more data are collected, the number of
+        hypotheses grows, increasing the computational complexity. By default
+        hypotheses are pruned at the end of each update (see
+        :py:meth:`.trim`.). To disable hypotheses trimming, initialise the
+        class with ``maxhypot`` set to ``None``.
+
+        Args:
+            X (numpy.array): Observed (1 x M) input data (predictor variable).
+            Y (numpy.array): Observed (1 x N) output data (response variable).
+
+        """
 
         # Initialise algorithm on first call to update. This allows the
         # algorithm to configure itself to the size of the first input/output
@@ -295,11 +395,14 @@ class Bcdm():
         k = X.shape[0] if np.ndim(X) > 1 else X.size
         m, n = self.__m, self.__n
 
+        # Allocate variables for the dynamic programming pass.
         loglik = -np.inf
         logmax = -np.inf
         logsum = -np.inf
         ind = np.nan
 
+        # Update hypotheses by updating each maxtrix variate, normal inverse
+        # gamma distribution over the linear models.
         self.__update_count += 1
         for hypotheses in self.__hypotheses:
 
@@ -374,7 +477,21 @@ class Bcdm():
             self.__probabilities.append(iteration)
 
     def trim(self, minprob=1.0e-6, maxhypot=20):
+        """Prune hypotheses to limit computational complexity.
 
+        The computational complexity of the algorithm can be managed by
+        limiting the number of hypotheses maintained. This method limits the
+        number of hypotheses maintained by the model by:
+
+            1) Removing any hypotheses with a support (probability) less than
+               ``minprob``.
+
+            2) Preserving the first ``maxhypot`` likely hypotheses and
+               discarding the rest.
+
+        """
+
+        # Skip pruning if less hypotheses exist than the maximum allowed.
         if len(self.__hypotheses) <= maxhypot:
             return
 
@@ -404,6 +521,25 @@ class Bcdm():
             hypot['log_probability'] -= logsum
 
     def segment(self):
+        """Return posterior probabilities OR sequence segmentation.
+
+        If the MAX-PRODUCT algorithm is selected, this method returns the most
+        likely sequence segmentation as a list of integers. Each integer in the
+        list marks where a segment begins.
+
+        If the SUM-PRODUCT algorithm is selected, this method returns the
+        posterior probabilities of the segmentation hypotheses as a numpy
+        array. Rows in the array represent hypotheses and columns in the array
+        represent data points in the time-series.
+
+        Returns:
+            object: If the MAX-PRODUCT algorithm is selected a list containing
+                    the most likely sequence segmentation is returned. If the
+                    SUM-PRODUCT algorithm is selected, a numpy array containing
+                    the posterior probabilities of the segmentation hypotheses
+                    is returned.
+
+        """
 
         # In the max-product algorithm, the most likely hypotheses are
         # tracked. Recover the most likely segment boundaries by performing a
