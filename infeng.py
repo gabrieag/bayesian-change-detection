@@ -275,6 +275,11 @@ class Bcdm():
     def __accum(self, x, y):
         return max(x, y) + np.log1p(np.exp(-abs(x - y)))
 
+    def block_update(self, X, Y):
+
+        for i in range(X.shape[0]):
+            self.update(X[i, :], Y[i, :])
+
     def update(self, X, Y):
 
         # Initialise algorithm on first call to update. This allows the
@@ -432,38 +437,3 @@ class Bcdm():
                     segment_probabilities[j, i + 1] = np.exp(probability)
 
             return segment_probabilities
-
-
-def filterdata(X, Y, mu=None, omega=None, sigma=None, eta=None, ratefun=0.1):
-
-    # Create an inference engine of the appropriate size to run the sum-product
-    # algorithm.
-    bcdm = Bcdm(mu=mu, omega=omega, sigma=sigma, eta=eta, alg='sumprod',
-                ratefun=ratefun)
-
-    k = X.shape[0]
-    for i in range(k):
-
-        # Update the segmentation hypotheses given the data, one point at a
-        # time.
-        bcdm.update(X[i, :], Y[i, :])
-
-    return bcdm.segment()
-
-
-def segmentdata(X, Y, mu=None, omega=None, sigma=None, eta=None, ratefun=0.1):
-
-    # Create an inference engine of the appropriate size to run the sum-product
-    # algorithm.
-    bcdm = Bcdm(mu=mu, omega=omega, sigma=sigma, eta=eta, alg='maxprod',
-                ratefun=ratefun)
-
-    k = X.shape[0]
-    for i in range(k):
-
-        # Update the segmentation hypotheses given the data, one point at a
-        # time.
-        bcdm.update(X[i, :], Y[i, :])
-
-    # Backtrack to find the most likely segmentation of the sequence.
-    return bcdm.segment()

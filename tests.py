@@ -1,13 +1,13 @@
 #!/usr/bin/python
 import os
-import numpy as np
 from os import path
-from matplotlib import pyplot
 
+import numpy as np
 from numpy import random
 from numpy import linalg
-from infeng import filterdata
-from infeng import segmentdata
+from matplotlib import pyplot
+
+from infeng import Bcdm
 from infeng import MatrixVariateNormalInvGamma
 
 
@@ -149,8 +149,17 @@ def synthetic_data():
 
     # Compute the posterior probabilities of the segmentation hypotheses. Then,
     # find the most likely segmentation of the sequence.
-    hypotprob = filterdata(X, Y, ratefun=rate)
-    changedet = segmentdata(X, Y, ratefun=rate)
+    bcdm_probabilities = Bcdm(alg='sumprod', ratefun=rate)
+    bcdm_segments = Bcdm(alg='maxprod', ratefun=rate)
+
+    # Update the segmentation hypotheses given the data.
+    bcdm_probabilities.block_update(X, Y)
+    bcdm_segments.block_update(X, Y)
+
+    # Recover the hypothesis probabilities and back-trace to find the most
+    # likely segmentation of the sequence.
+    hypotprob = bcdm_probabilities.segment()
+    changedet = bcdm_segments.segment()
 
     fig, (upperaxes, loweraxes) = pyplot.subplots(2, sharex=True)
     fig.subplots_adjust(hspace=0)
@@ -232,10 +241,24 @@ def well_data():
     loc = np.array([(loc, )])
     scale = np.array([(scale, )])
 
+    kwargs = {'ratefun': rate,
+              'mu': loc,
+              'sigma': scale}
+
     # Compute the posterior probabilities of the segmentation hypotheses. Then,
     # find the most likely sequence segmentation.
-    hypotprob = filterdata(X, Y, mu=loc, sigma=scale, ratefun=rate)
-    changedet = segmentdata(X, Y, mu=loc, sigma=scale, ratefun=rate)
+    bcdm_probabilities = Bcdm(alg='sumprod', **kwargs)
+    bcdm_segments = Bcdm(alg='maxprod', **kwargs)
+
+    # Update the segmentation hypotheses given the data, one point at a time.
+    for i in range(X.shape[0]):
+        bcdm_probabilities.update(X[i, :], Y[i, :])
+        bcdm_segments.update(X[i, :], Y[i, :])
+
+    # Recover the hypothesis probabilities and back-trace to find the most
+    # likely segmentation of the sequence.
+    hypotprob = bcdm_probabilities.segment()
+    changedet = bcdm_segments.segment()
 
     fig, (upperaxes, loweraxes) = pyplot.subplots(2, sharex=True)
     fig.subplots_adjust(hspace=0)
