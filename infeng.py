@@ -180,7 +180,7 @@ class Bcdm():
                  alg='sumprod', ratefun=0.1, featfun=None, minprob=1.0e-6,
                  maxhypot=20):
 
-        # The inference algorithm must be either sum-product or max-product.
+        # The inference algorithm must be either sum-product or sum-product.
         assert alg in ['sumprod', 'maxprod']
         self.__alg__ = alg.lower()
 
@@ -221,6 +221,7 @@ class Bcdm():
 
         self.__hypotheses = list()
         self.__index = list()
+        self.__probabilities = list()
 
         self.__featfun = featfun if callable(featfun) else lambda x: x
         self.__ratefun = ratefun if callable(ratefun) else lambda x: ratefun
@@ -264,7 +265,8 @@ class Bcdm():
 
         # Create the initial hypothesis, which states that the first segment is
         # about to begin.
-        self.__hypotheses = [{'index': 1,
+        self.__update_count = 0
+        self.__hypotheses = [{'index': 0,
                               'count': 0,
                               'log_probability': 0.0,
                               'distribution': stat,
@@ -293,6 +295,7 @@ class Bcdm():
         logsum = -np.inf
         ind = np.nan
 
+        self.__update_count += 1
         for hypotheses in self.__hypotheses:
 
             # Update the sufficient statistics.
@@ -325,11 +328,6 @@ class Bcdm():
             hypotheses['log_probability'] += np.log1p(-hazard) + log_density
             logsum = self.__accum(logsum, hypotheses['log_probability'])
 
-        # Keep track of the most likely hypotheses.
-        if self.__alg__ == 'maxprod':
-            loglik = logmax
-            self.__index.append(ind)
-
         stat = MatrixVariateNormalInvGamma(self.__mu,
                                            self.__omega,
                                            self.__sigma,
@@ -337,7 +335,7 @@ class Bcdm():
 
         # Add a new hypothesis, which states that the next segment is about to
         # begin.
-        self.__hypotheses.append({'index': len(self.__hypotheses) + 1,
+        self.__hypotheses.append({'index': self.__update_count,
                                   'count': 0,
                                   'log_probability': loglik,
                                   'distribution': stat,
@@ -347,13 +345,28 @@ class Bcdm():
         self.logsum = logsum
 
         # Normalize the hypotheses so that their probabilities sum to one.
-        for hypot in self.__hypotheses:
-            hypot['log_probability'] -= logsum
+        for hypothesis in self.__hypotheses:
+            hypothesis['log_probability'] -= logsum
 
         # Automatically trim hypothesis on each update if requested.
         if self.__maximum_hypotheses is not None:
             self.trim(minprob=self.__minimum_probability,
                       maxhypot=self.__maximum_hypotheses)
+
+        # In the max-product algorithm, keep track of the most likely
+        # hypotheses.
+        if self.__alg__ == 'maxprod':
+            loglik = logmax
+            self.__index.append(ind)
+
+        # In the sum-product algorithm, keep track of the probabilities.
+        else:
+            iteration = list()
+            for hypothesis in self.__hypotheses:
+                iteration.append((hypothesis['count'],
+                                  hypothesis['log_probability']))
+
+            self.__probabilities.append(iteration)
 
     def trim(self, minprob=1.0e-6, maxhypot=20):
 
@@ -387,65 +400,60 @@ class Bcdm():
 
     def segment(self):
 
-        k = len(self.__index)
+        # In the max-product algorithm, the most likely hypotheses are
+        # tracked. Recover the most likely segment boundaries by performing a
+        # back-trace.
+        if self.__alg__ == 'maxprod':
 
-        # Find the most likely hypothesis.
-        hypot = max(self.__hypotheses, key=lambda dct: dct['log_probability'])
+            # Find the most likely hypothesis.
+            max_hypothesis = max(self.__hypotheses,
+                                 key=lambda dct: dct['log_probability'])
 
-        count = hypot['count'] - 1
+            # Find the best sequence segmentation given all the data so far.
+            segment_boundaries = [len(self.__index) - 1, ]
+            index = segment_boundaries[0] - 1
+            count = max_hypothesis['count'] - 1
+            while index > 0:
+                index -= count
+                segment_boundaries.insert(0, index)
+                count = self.__index[index - 1]
 
-        # Initialize the segment boundaries.
-        segbound = [k - 1]
+            return segment_boundaries
 
-        # Find the best sequence segmentation given all the data so far.
-        index = k - 1
-        while index > 0:
-            index -= count
-            segbound.insert(0, index)
-            count = self.__index[index - 1]
+        # In the sum-product algorithm, the segment probabilities are
+        # tracked. Recover the segment probabilities by formatting the stored
+        # history.
+        else:
+            k = len(self.__probabilities)
+            segment_probabilities = np.zeros((k + 1, k + 1))
 
-        return segbound
+            for i in range(len(self.__probabilities)):
+                for (j, probability) in self.__probabilities[i]:
+                    segment_probabilities[j, i + 1] = np.exp(probability)
 
-    def state(self):
-
-        # Iterate over the segmentation hypotheses.
-        for hypot in self.__hypotheses:
-            yield hypot['count'], np.exp(hypot['log_probability'])
+            return segment_probabilities
 
 
 def filterdata(X, Y, mu=None, omega=None, sigma=None, eta=None, ratefun=0.1):
-
-    k = X.shape[0]
 
     # Create an inference engine of the appropriate size to run the sum-product
     # algorithm.
     bcdm = Bcdm(mu=mu, omega=omega, sigma=sigma, eta=eta, alg='sumprod',
                 ratefun=ratefun)
 
-    # Allocate space for storing the posterior probabilities of the
-    # segmentation hypotheses.
-    prob = np.zeros([k + 1, k + 1])
-
-    # Initialize the probabilities.
-    for j, alpha in bcdm.state():
-        prob[j, 0] = alpha
-
+    k = X.shape[0]
     for i in range(k):
 
         # Update the segmentation hypotheses given the data, one point at a
         # time.
         bcdm.update(X[i, :], Y[i, :])
 
-        # Update the probabilities.
-        for j, alpha in bcdm.state():
-            prob[j, i + 1] = alpha
-
-    return prob
+    return bcdm.segment()
 
 
 def segmentdata(X, Y, mu=None, omega=None, sigma=None, eta=None, ratefun=0.1):
 
-    # Create an inference engine of the appropriate size to run the max-product
+    # Create an inference engine of the appropriate size to run the sum-product
     # algorithm.
     bcdm = Bcdm(mu=mu, omega=omega, sigma=sigma, eta=eta, alg='maxprod',
                 ratefun=ratefun)

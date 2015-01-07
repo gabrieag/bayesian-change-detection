@@ -11,8 +11,8 @@ from infeng import segmentdata
 from infeng import MatrixVariateNormalInvGamma
 
 
-def gendata(m, n, k, l, mu=None, omega=None, sigma=None, eta=None,
-            featfun=None):
+def random_segments(m, n, k, l, mu=None, omega=None, sigma=None, eta=None,
+                    featfun=None):
 
     # Set uninformative prior for the location parameter.
     if mu is None:
@@ -141,9 +141,9 @@ def synthetic_data():
 
     # Generate a sequence of segments and, for each segment, generate a set of
     # predictor-response data.
-    segbound, X, Y = gendata(numpred, numresp, numpoint, numseg,
-                             omega=gainparam*np.eye(numpred),
-                             eta=noiseparam)
+    segbound, X, Y = random_segments(numpred, numresp, numpoint, numseg,
+                                     omega=gainparam*np.eye(numpred),
+                                     eta=noiseparam)
 
     rate = float(numseg) / float(numpoint - numseg)
 
@@ -276,4 +276,4 @@ def well_data():
 
 if __name__ == '__main__':
     synthetic_data()
-    # well_data()
+    well_data()
