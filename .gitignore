@@ -6,5 +6,6 @@
 .project
 .pydevproject
 
+# WingWare IDE
 *.wpr
 *.wpu
