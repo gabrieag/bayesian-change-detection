@@ -350,7 +350,7 @@ class Bcdm():
                               'distribution': stat,
                               'log_constant': stat.log_constant()}]
 
-    def __accum(self, x, y):
+    def __soft_max(self, x, y):
         return max(x, y) + np.log1p(np.exp(-abs(x - y)))
 
     def block_update(self, X, Y):
@@ -431,7 +431,7 @@ class Bcdm():
             # (Equation 17)
             hazard = self.__ratefun(hypotheses['count'])
             aux = np.log(hazard) + log_density + hypotheses['log_probability']
-            loglik = self.__accum(loglik, aux)
+            loglik = self.__soft_max(loglik, aux)
 
             # Keep track of the highest, log-likelihood.
             if aux > logmax:
@@ -439,7 +439,7 @@ class Bcdm():
 
             # Update and accumulate the log-probabilities.
             hypotheses['log_probability'] += np.log1p(-hazard) + log_density
-            logsum = self.__accum(logsum, hypotheses['log_probability'])
+            logsum = self.__soft_max(logsum, hypotheses['log_probability'])
 
         stat = MatrixVariateNormalInvGamma(self.__mu,
                                            self.__omega,
@@ -454,7 +454,7 @@ class Bcdm():
                                   'distribution': stat,
                                   'log_constant': stat.log_constant()})
 
-        logsum = self.__accum(logsum, loglik)
+        logsum = self.__soft_max(logsum, loglik)
         self.logsum = logsum
 
         # Normalize the hypotheses so that their probabilities sum to one.
@@ -521,7 +521,7 @@ class Bcdm():
         # Normalize the hypotheses so that their probabilities sum to one.
         logsum = -np.inf
         for hypot in self.__hypotheses:
-            logsum = self.__accum(logsum, hypot['log_probability'])
+            logsum = self.__soft_max(logsum, hypot['log_probability'])
         for hypot in self.__hypotheses:
             hypot['log_probability'] -= logsum
 
