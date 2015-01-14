@@ -201,18 +201,10 @@ class Bcdm():
     """Bayesian change detection model.
 
     Args:
-        mu (numpy.array): (M x N) location hyper-parameter used when matrix
-                          variate, normal inverse gamma distributions are
-                          initialised during segmentation.
-        omega (numpy.array): (M x M) scale hyper-parameter used when matrix
-                             variate, normal inverse gamma distributions are
-                             initialised during segmentation.
-        sigma (numpy.array): (N x N) dispersion hyper-parameter used when
-                             matrix variate, normal inverse gamma distributions
-                             are initialised during segmentation.
-        eta (float): shape hyper-parameter used when matrix variate, normal
-                     inverse gamma distributions are initialised during
-                     segmentation.
+        mu (numpy.array): (M x N) location parameters of the prior distribution.
+        omega (numpy.array): (M x M) scale parameters of the prior distribution.
+        sigma (numpy.array): (N x N) dispersion parameters of the prior distribution.
+        eta (float): shape parameter of the prior distribution.
         alg (string): Specifies the algorithm to use. Choose either 'sumprod'
                       for the sum-product algorithm or 'maxprod' for the
                       max-product algorithm. If the sum-product algorithm is
@@ -225,7 +217,14 @@ class Bcdm():
                          1. Segments are MORE likely to be created with values
                          closer to zero. Segments are LESS likely to form with
                          values closer to 1. Alternatively, ratefun can be set
-                         to an executable hazard function.
+                         to an executable hazard function. The hazard function
+                         must accept non-negative integers and return
+                         non-negative floating-point numbers.
+        featfun (callable): Feature functions for basis function
+                            expansion. Feature functions provide additional
+                            flexibility by mapping the predictor variables to
+                            an intermmediate feature space, thus allowing the
+                            user to model non-linear relationships.
         minprob (float): Minimum probability required for a
                          hypothesis. Hypotheses with insignificant support
                          (probabilities below this value) will be pruned.
