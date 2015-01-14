@@ -538,11 +538,11 @@ class Bcdm():
         represent data points in the time-series.
 
         Returns:
-            object: If the MAX-PRODUCT algorithm is selected a list containing
-                    the most likely sequence segmentation is returned. If the
-                    SUM-PRODUCT algorithm is selected, a numpy array containing
-                    the posterior probabilities of the segmentation hypotheses
-                    is returned.
+            object: This method returns the inference results. In the case of
+                    the MAX-PRODUCT algorithm, the method returns the most
+                    likely segmentation. In the case of the SUM-PRODUCT
+                    algorithm, this method returns the posterior probabilities
+                    of the segmentation hypotheses.
 
         """
 

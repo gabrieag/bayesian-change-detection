@@ -1,7 +1,7 @@
 #!/usr/bin/python
 """Demonstrate Bayesian change-point detection model.
 
-.. codeauthor:: Gabriel Agamennoni <abriel.agamennoni@mavt.ethz.ch>
+.. codeauthor:: Gabriel Agamennoni <gabriel.agamennoni@mavt.ethz.ch>
 .. codeauthor:: Asher Bender <a.bender@acfr.usyd.edu.au>
 
 """
@@ -21,19 +21,19 @@ def random_segments(m, n, k, l, mu=None, omega=None, sigma=None, eta=None,
                     featfun=None):
     """Generate random segmented multi-variate linear model data."""
 
-    # Set uninformative prior for the location parameter.
+    # Set default prior for the location parameter.
     if mu is None:
         mu = np.zeros([m, n])
 
-    # Set uninformative prior for the scale parameter.
+    # Set default prior for the scale parameter.
     if omega is None:
         omega = np.eye(m)
 
-    # Set uninformative prior for the dispersion/noise parameter.
+    # Set default prior for the dispersion/noise parameter.
     if sigma is None:
         sigma = np.eye(n)
 
-    # Set uninformative prior for the shape parameter.
+    # Set default prior for the shape parameter.
     if eta is None:
         eta = n
 
