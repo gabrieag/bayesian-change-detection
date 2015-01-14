@@ -132,7 +132,7 @@ class MatrixVariateNormalInvGamma(object):
             self.__prod[m:, m:] += np.outer(Y, Y)
             self.__weight += 1
 
-    def logconst(self):
+    def log_constant(self):
 
         m, n = self.__m, self.__n
 
@@ -349,7 +349,7 @@ class Bcdm():
                               'count': 0,
                               'log_probability': 0.0,
                               'distribution': stat,
-                              'log_constant': stat.logconst()}]
+                              'log_constant': stat.log_constant()}]
 
     def __accum(self, x, y):
         return max(x, y) + np.log1p(np.exp(-abs(x - y)))
@@ -419,7 +419,7 @@ class Bcdm():
             # (posterior parameter distribution).
             # (Equation 8)
             n_o = hypotheses['log_constant']
-            n_k = hypotheses['log_constant'] = hypotheses['distribution'].logconst()
+            n_k = hypotheses['log_constant'] = hypotheses['distribution'].log_constant()
 
             # Evaluate the log-density of the predictive distribution.
             # (Equation 16)
@@ -453,7 +453,7 @@ class Bcdm():
                                   'count': 0,
                                   'log_probability': loglik,
                                   'distribution': stat,
-                                  'log_constant': stat.logconst()})
+                                  'log_constant': stat.log_constant()})
 
         logsum = self.__accum(logsum, loglik)
         self.logsum = logsum
