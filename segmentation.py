@@ -150,7 +150,7 @@ class MatrixVariateNormalInvGamma(object):
                w * np.log(d[m:] / np.sqrt(w)).sum() - \
                n * (0.5 * w) * np.log(0.5 * w)
 
-    def param(self):
+    def parameters(self):
         """Return the posterior parameters.
 
         All the information content of the data is summarized by the sufficient
