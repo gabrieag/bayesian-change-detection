@@ -142,8 +142,8 @@ def synthetic_data():
 
     # Recover the hypothesis probabilities and back-trace to find the most
     # likely segmentation of the sequence.
-    hypotheses_probability = bcdm_probabilities.segment()
-    segments = bcdm_segments.segment()
+    hypotheses_probability = bcdm_probabilities.infer()
+    segments = bcdm_segments.infer()
 
     # Create subplots with shared X-axis.
     fig, (upperaxes, loweraxes) = plt.subplots(2, sharex=True)
@@ -216,8 +216,8 @@ def well_data():
 
     # Recover the hypothesis probabilities and back-trace to find the most
     # likely segmentation of the sequence.
-    hypotheses_probability = bcdm_probabilities.segment()
-    segments = bcdm_segments.segment()
+    hypotheses_probability = bcdm_probabilities.infer()
+    segments = bcdm_segments.infer()
 
     # Create subplots with shared X-axis.
     fig, (upperaxes, loweraxes) = plt.subplots(2, sharex=True)

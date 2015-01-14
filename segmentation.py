@@ -297,7 +297,7 @@ class Bcdm():
 
         # Allocate variables for tracking segments.
         self.__hypotheses = list()
-        self.__index = list()
+        self.__counts = list()
         self.__probabilities = list()
 
         self.__basisfun = basisfun if callable(basisfun) else lambda x: x
@@ -409,37 +409,37 @@ class Bcdm():
         # Update hypotheses by updating each maxtrix variate, normal inverse
         # gamma distribution over the linear models.
         self.__update_count += 1
-        for hypotheses in self.__hypotheses:
+        for hypothesis in self.__hypotheses:
 
             # Update the sufficient statistics.
-            hypotheses['distribution'].update(self.__basisfun(X), Y)
+            hypothesis['distribution'].update(self.__basisfun(X), Y)
 
             # Compute the log-normalization constant after the update
             # (posterior parameter distribution).
             # (Equation 8)
-            n_o = hypotheses['log_constant']
-            n_k = hypotheses['log_constant'] = hypotheses['distribution'].log_constant()
+            n_o = hypothesis['log_constant']
+            n_k = hypothesis['log_constant'] = hypothesis['distribution'].log_constant()
 
             # Evaluate the log-density of the predictive distribution.
             # (Equation 16)
             log_density = n_k - n_o - k * (0.5 * m * n) * np.log(2.0 * np.pi)
 
             # Increment the counter.
-            hypotheses['count'] += 1
+            hypothesis['count'] += 1
 
             # Accumulate the log-likelihood of the data.
             # (Equation 17)
-            hazard = self.__ratefun(hypotheses['count'])
-            aux = np.log(hazard) + log_density + hypotheses['log_probability']
+            hazard = self.__ratefun(hypothesis['count'])
+            aux = np.log(hazard) + log_density + hypothesis['log_probability']
             loglik = self.__soft_max(loglik, aux)
 
             # Keep track of the highest, log-likelihood.
             if aux > logmax:
-                logmax, ind = aux, hypotheses['count']
+                logmax, ind = aux, hypothesis['count']
 
             # Update and accumulate the log-probabilities.
-            hypotheses['log_probability'] += np.log1p(-hazard) + log_density
-            logsum = self.__soft_max(logsum, hypotheses['log_probability'])
+            hypothesis['log_probability'] += np.log1p(-hazard) + log_density
+            logsum = self.__soft_max(logsum, hypothesis['log_probability'])
 
         stat = MatrixVariateNormalInvGamma(self.__mu,
                                            self.__omega,
@@ -463,14 +463,14 @@ class Bcdm():
 
         # Automatically trim hypothesis on each update if requested.
         if self.__maximum_hypotheses is not None:
-            self.trim(minprob=self.__minimum_probability,
-                      maxhypot=self.__maximum_hypotheses)
+            self.trim_hypotheses(minprob=self.__minimum_probability,
+                                 maxhypot=self.__maximum_hypotheses)
 
         # In the max-product algorithm, keep track of the most likely
         # hypotheses.
         if self.__alg__ == 'maxprod':
             loglik = logmax
-            self.__index.append(ind)
+            self.__counts.append(ind)
 
         # In the sum-product algorithm, keep track of the probabilities.
         else:
@@ -481,7 +481,7 @@ class Bcdm():
 
             self.__probabilities.append(iteration)
 
-    def trim(self, minprob=1.0e-6, maxhypot=20):
+    def trim_hypotheses(self, minprob=1.0e-6, maxhypot=20):
         """Prune hypotheses to limit computational complexity.
 
         The computational complexity of the algorithm can be managed by
@@ -525,7 +525,7 @@ class Bcdm():
         for hypot in self.__hypotheses:
             hypot['log_probability'] -= logsum
 
-    def segment(self):
+    def infer(self):
         """Return posterior probabilities OR sequence segmentation.
 
         If the MAX-PRODUCT algorithm is selected, this method returns the most
@@ -556,13 +556,13 @@ class Bcdm():
                                  key=lambda dct: dct['log_probability'])
 
             # Find the best sequence segmentation given all the data so far.
-            segment_boundaries = [len(self.__index) - 1, ]
+            segment_boundaries = [len(self.__counts) - 1, ]
             index = segment_boundaries[0] - 1
             count = max_hypothesis['count'] - 1
             while index > 0:
                 index -= count
                 segment_boundaries.insert(0, index)
-                count = self.__index[index - 1]
+                count = self.__counts[index - 1]
 
             return segment_boundaries
 
