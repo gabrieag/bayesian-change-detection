@@ -220,11 +220,11 @@ class Bcdm():
                          to an executable hazard function. The hazard function
                          must accept non-negative integers and return
                          non-negative floating-point numbers.
-        featfun (callable): Feature functions for basis function
-                            expansion. Feature functions provide additional
-                            flexibility by mapping the predictor variables to
-                            an intermmediate feature space, thus allowing the
-                            user to model non-linear relationships.
+        basisfun (callable): Feature functions for basis function
+                             expansion. Feature functions provide additional
+                             flexibility by mapping the predictor variables to
+                             an intermmediate feature space, thus allowing the
+                             user to model non-linear relationships.
         minprob (float): Minimum probability required for a
                          hypothesis. Hypotheses with insignificant support
                          (probabilities below this value) will be pruned.
@@ -241,7 +241,7 @@ class Bcdm():
     """
 
     def __init__(self, mu=None, omega=None, sigma=None, eta=None,
-                 alg='sumprod', ratefun=0.1, featfun=None, minprob=1.0e-6,
+                 alg='sumprod', ratefun=0.1, basisfun=None, minprob=1.0e-6,
                  maxhypot=20):
 
         # The inference algorithm must be either sum-product or sum-product.
@@ -300,7 +300,7 @@ class Bcdm():
         self.__index = list()
         self.__probabilities = list()
 
-        self.__featfun = featfun if callable(featfun) else lambda x: x
+        self.__basisfun = basisfun if callable(basisfun) else lambda x: x
         self.__ratefun = ratefun if callable(ratefun) else lambda x: ratefun
 
     def __initialise_algorithm(self, m, n):
@@ -412,7 +412,7 @@ class Bcdm():
         for hypotheses in self.__hypotheses:
 
             # Update the sufficient statistics.
-            hypotheses['distribution'].update(self.__featfun(X), Y)
+            hypotheses['distribution'].update(self.__basisfun(X), Y)
 
             # Compute the log-normalization constant after the update
             # (posterior parameter distribution).
