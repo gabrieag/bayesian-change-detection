@@ -94,14 +94,13 @@ class MatrixVariateNormalInvGamma(object):
     def update(self, X, Y):
         """Update the sufficient statistics given observed data.
 
-        The sufficient statistics represent the only parameters required to
-        describe the shape of the distribution. Due to conjugacy, the
-        sufficient statistics also form the hyper-parameters of the
-        distribution. In a Bayesian context, when the sufficient statistics are
-        referred to as 'hyper-parameters', it implies the sufficient statistics
-        reflect prior information about the distribution. After updating the
-        distribution with observed data, the sufficient statistics refer to the
-        posterior distribution.
+        The sufficient statistics are the only parameters required to describe
+        the shape of the distribution. Initially, the sufficient statistics
+        contain no information apart from that implied by the prior
+        distribution. As data arrive, the statistics are updated incrementally
+        in order to reflect this new knowledge. Performing updates allows the
+        sufficient statistics to summarise all information contained in the
+        data observed so far.
 
         """
 
@@ -152,7 +151,14 @@ class MatrixVariateNormalInvGamma(object):
                n * (0.5 * w) * np.log(0.5 * w)
 
     def param(self):
-        """Return parameters of the posterior distribution."""
+        """Return the posterior parameters.
+
+        All the information content of the data is summarized by the sufficient
+        statistics. As a result the posterior parameters are a function of the
+        sufficient statistics. This is a consequence of the conjugacy of the
+        matrix-variate Gaussian-inverse-Gamma distribution.
+
+        """
 
         m = self.__m
         s = linalg.cholesky(self.__prod).transpose()
