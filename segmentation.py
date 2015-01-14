@@ -310,14 +310,14 @@ class Bcdm():
         if self.__m is None:
             self.__m = m
         elif self.__m != m:
-            msg = 'Expected %i dimensions in the predictor variable.' % m
+            msg = 'Expected {} dimensions in the predictor variable.'.format(m)
             raise Exception(msg)
 
         # Ensure output dimensions are consistent.
         if self.__n is None:
             self.__n = n
         elif self.__n != n:
-            msg = 'Expected %i dimensions in the response variable.' % n
+            msg = 'Expected {} dimensions in the response variable.'.format(n)
             raise Exception(msg)
 
         # Set uninformative prior for the location parameter.
