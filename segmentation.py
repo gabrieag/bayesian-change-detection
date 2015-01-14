@@ -23,7 +23,7 @@ from scipy import special
 
 
 class MatrixVariateNormalInvGamma(object):
-    """Matrix-variate normal, inverse-gamma distribution.
+    """Matrix-variate normal, matrix-variate inverse gamma distribution
 
     The matrix-variate normal, inverse-gamma distribution is the conjugate
     prior for a matrix-variate normal distribution. As a result the
