@@ -569,7 +569,7 @@ class Bcdm():
         # history.
         else:
             k = len(self.__probabilities)
-            segment_probabilities = np.zeros((k + 1, k + 1))
+            segment_probabilities = np.ones((k + 1, k + 1))
 
             # Update hypotheses probabilities.
             for i in range(len(self.__probabilities)):
