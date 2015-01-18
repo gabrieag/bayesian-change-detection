@@ -441,10 +441,14 @@ class Bcdm():
             hypothesis['log_probability'] += np.log1p(-hazard) + log_density
             logsum = self.__soft_max(logsum, hypothesis['log_probability'])
 
-        stat = MatrixVariateNormalInvGamma(self.__mu,
-                                           self.__omega,
-                                           self.__sigma,
-                                           self.__eta)
+        # In the max-product algorithm, keep track of the most likely
+        # hypotheses.
+        if self.__alg__ == 'maxprod':
+            loglik = logmax
+            self.__counts.append(ind)
+
+        stat = MatrixVariateNormalInvGamma(self.__mu, self.__omega,
+                                           self.__sigma, self.__eta)
 
         # Add a new hypothesis, which states that the next segment is about to
         # begin.
@@ -466,14 +470,8 @@ class Bcdm():
             self.trim_hypotheses(minprob=self.__minimum_probability,
                                  maxhypot=self.__maximum_hypotheses)
 
-        # In the max-product algorithm, keep track of the most likely
-        # hypotheses.
-        if self.__alg__ == 'maxprod':
-            loglik = logmax
-            self.__counts.append(ind)
-
         # In the sum-product algorithm, keep track of the probabilities.
-        else:
+        if self.__alg__ == 'sumprod':
             iteration = list()
             for hypothesis in self.__hypotheses:
                 iteration.append((hypothesis['count'],
