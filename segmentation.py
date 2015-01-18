@@ -571,8 +571,12 @@ class Bcdm():
             k = len(self.__probabilities)
             segment_probabilities = np.zeros((k + 1, k + 1))
 
+            # Update hypotheses probabilities.
             for i in range(len(self.__probabilities)):
                 for (j, probability) in self.__probabilities[i]:
                     segment_probabilities[j, i + 1] = np.exp(probability)
+
+            # A segment always occurs at the beginning of the dataset.
+            segment_probabilities[0, 0] = 1.0
 
             return segment_probabilities
