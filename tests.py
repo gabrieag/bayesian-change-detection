@@ -76,7 +76,6 @@ def random_segments(m, n, k, l, mu=None, omega=None, sigma=None, eta=None,
 
 
 def plot_probability(axes, prob, scale=None, **arg):
-
     """Plot hypotheses probability as a raster."""
 
     if scale is None:
@@ -95,22 +94,37 @@ def plot_probability(axes, prob, scale=None, **arg):
                 **arg)
 
 
-def plot_segment_span(x, segments, **arg):
+def plot_segment_span(x, segments=None, **arg):
     """Plot segments as alternating vertical spans (rectangles)."""
 
-    for i in range(len(segments) - 1):
-        if i % 2 == 0:
-            plt.axvspan(x[segments[i]], x[segments[i + 1]], **arg)
+    if segments is not None:
+        for i in range(len(segments) - 1):
+            if i % 2 == 0:
+                plt.axvspan(x[segments[i]], x[segments[i + 1]], **arg)
+
+    else:
+        for i in range(len(x) - 1):
+            if i % 2 == 0:
+                plt.axvspan(x[i], x[i + 1], **arg)
 
 
-def plot_segment_boundaries(x, segments, **args):
+def plot_segment_boundaries(x, segments=None, **args):
     """Plot segment boundaries as vertical lines."""
 
-    for i in range(len(segments)):
-        plt.axvline(x[segments[i]], **args)
+    if segments is not None:
+        for i in range(len(segments)):
+            plt.axvline(x[segments[i]], **args)
+
+    else:
+        for i in range(len(x)):
+            plt.axvline(x[i], **args)
 
 
-def synthetic_data():
+def plot_segment_models(x, segments, basisfun=None, **args):
+    pass
+
+
+def random_data():
     """Simple test with synthetic data."""
 
     # Set the size of the problem.
@@ -165,9 +179,83 @@ def synthetic_data():
         plot_segment_boundaries(t, segbound, color='k', linestyle=':')
         ax.set_xlim([0, numpoint])
 
-    fig.canvas.set_window_title('Synthetic data')
-    upperaxes.set_title('Synthetic data')
+    fig.canvas.set_window_title('Random data')
+    upperaxes.set_title('Random data')
     upperaxes.set_ylabel('Response')
+    loweraxes.set_xlabel('Sequence number')
+    loweraxes.set_ylabel('Hypothesis probability')
+
+
+def non_sinusoidal():
+
+    rate = 0.1
+    samples = 1000
+
+    # create non-sinusoidal waveform functions.
+    square_wave = lambda x: np.sign(np.sin(x))
+    sawtooth_wave = lambda a, x: 2 * ((x/a) - np.floor(0.5 + (x/a)))
+    triangle_wave = lambda a, x: 2 * np.abs(sawtooth_wave(a, x)) - 1
+
+    # Create input and outputs.
+    X = np.linspace(0, 3*2*np.pi, samples).reshape(samples, 1)
+    Y = np.hstack([square_wave(X),
+                   triangle_wave(2*np.pi, X - np.pi/2),
+                   sawtooth_wave(2*np.pi, X + np.pi/3)])
+
+    # Create Gaussian noise.
+    Y += np.vstack([0.025 * np.random.randn(samples),
+                    0.1 * np.random.randn(samples),
+                    0.05 * np.random.randn(samples)]).T
+
+    # Determine location of true boundaries.
+    true_boundaries = np.hstack((np.pi * np.arange(0, 7),
+                                 np.pi * np.arange(0, 6) + np.pi/2,
+                                 2 * np.pi * np.arange(0, 4) + np.pi - np.pi/3))
+
+    true_boundaries = np.sort(true_boundaries[true_boundaries <= max(X)])
+
+    # Compute the posterior probabilities of the segmentation hypotheses. Then,
+    # find the most likely segmentation of the sequence.
+    bcdm_probabilities = Bcdm(alg='sumprod', ratefun=rate)
+    bcdm_segments = Bcdm(alg='maxprod', ratefun=rate)
+
+    # Update the segmentation hypotheses given the data.
+    bcdm_probabilities.block_update(X, Y)
+    bcdm_segments.block_update(X, Y)
+
+    # Recover the hypothesis probabilities and back-trace to find the most
+    # likely segmentation of the sequence.
+    hypotheses_probability = bcdm_probabilities.infer()
+    segments = bcdm_segments.infer()
+
+    # Create subplots with shared X-axis.
+    fig, (upperaxes, loweraxes) = plt.subplots(2, sharex=False)
+
+    # Plot the response data.
+    for i in range(Y.shape[1]):
+        upperaxes.plot(X, Y[:, i])
+
+    # Plot the posterior probabilities of the segmentation hypotheses.
+    plot_probability(loweraxes, hypotheses_probability, cmap=plt.cm.gray)
+
+    # Plot the changes detected by the segmentation algorithm as alternating
+    # coloured spans. Plot the true segment boundaries as vertical lines.
+    plt.sca(upperaxes)
+    plot_segment_span(X, segments, facecolor='y', alpha=0.2, edgecolor='none')
+    plot_segment_boundaries(true_boundaries, color='k', linestyle=':')
+
+    plt.sca(loweraxes)
+    plot_segment_span(segments, facecolor='y', alpha=0.2, edgecolor='none')
+    plot_segment_boundaries(samples * true_boundaries / max(X),
+                            color='k', linestyle=':')
+
+    upperaxes.set_xlim([0, max(X)])
+    loweraxes.set_xlim([0, len(X)])
+
+    fig.canvas.set_window_title('Non-sinusoidal data')
+    upperaxes.set_title('Non-sinusoidal data')
+    upperaxes.set_ylabel('Response')
+    upperaxes.set_xlabel('Predictor')
     loweraxes.set_xlabel('Sequence number')
     loweraxes.set_ylabel('Hypothesis probability')
 
@@ -245,6 +333,8 @@ def well_data():
 
 
 if __name__ == '__main__':
-    synthetic_data()
+
+    random_data()
+    non_sinusoidal()
     well_data()
     plt.show()

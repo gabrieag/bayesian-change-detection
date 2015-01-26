@@ -12,7 +12,7 @@ e.g. its duration and the linear relationship between inputs and outputs, given
 all the data so far. Each time a new pair of data is received, the hypotheses
 are propagated and re-weighted to reflect this new knowledge.
 
-.. codeauthor:: Gabriel Agamennoni <abriel.agamennoni@mavt.ethz.ch>
+.. codeauthor:: Gabriel Agamennoni <gabriel.agamennoni@mavt.ethz.ch>
 .. codeauthor:: Asher Bender <a.bender@acfr.usyd.edu.au>
 
 """
@@ -569,7 +569,8 @@ class Bcdm():
         # history.
         else:
             k = len(self.__probabilities)
-            segment_probabilities = np.ones((k + 1, k + 1))
+            segment_probabilities = np.zeros((k + 1, k + 1))
+            segment_probabilities[0, 0] = 1.0
 
             # Update hypotheses probabilities.
             for i in range(len(self.__probabilities)):
