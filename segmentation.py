@@ -507,24 +507,6 @@ class Bcdm():
         for hypot in self.__hypotheses:
             hypot['log_probability'] -= logsum
 
-    def block_update(self, X, Y):
-        """Update model with multiple observations.
-
-        This method is a convenience method for updating the model when many
-        new input-output data are available. This method simply iterates over
-        the inputs calling :py:meth:`.update`.
-
-        Args:
-            X (numpy.array): Observed (K x M) input data (predictor variable).
-            Y (numpy.array): Observed (K x N) output data (response variable).
-
-        """
-
-        # Iterate through the rows of the input-output data updating the
-        # hypotheses in the model.
-        for i in range(X.shape[0]):
-            self.update(X[i, :], Y[i, :])
-
     def infer(self):
         """Return posterior probabilities OR sequence segmentation.
 

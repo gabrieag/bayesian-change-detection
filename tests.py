@@ -154,8 +154,9 @@ def random_data():
     bcdm_segments = Bcdm(alg='maxprod', ratefun=rate)
 
     # Update the segmentation hypotheses given the data.
-    bcdm_probabilities.block_update(X, Y)
-    bcdm_segments.block_update(X, Y)
+    for x, y in zip(X, Y):
+        bcdm_probabilities.update(x, y)
+        bcdm_segments.update(x, y)
 
     # Recover the hypothesis probabilities and back-trace to find the most
     # likely segmentation of the sequence.
@@ -228,8 +229,10 @@ def non_sinusoidal():
                          sigma=sigma)
 
     # Update the segmentation hypotheses given the data.
-    bcdm_probabilities.block_update(X, Y)
-    bcdm_segments.block_update(X, Y)
+    for x, y in zip(X, Y):
+        basis = lambda xt: xt - x
+        bcdm_probabilities.update(x, y, basisfunc=basis)
+        bcdm_segments.update(x, y, basisfunc=basis)
 
     # Recover the hypothesis probabilities and back-trace to find the most
     # likely segmentation of the sequence.
@@ -305,10 +308,10 @@ def well_data():
     bcdm_probabilities = Bcdm(alg='sumprod', **kwargs)
     bcdm_segments = Bcdm(alg='maxprod', **kwargs)
 
-    # Update the segmentation hypotheses given the data, one point at a time.
-    for i in range(X.shape[0]):
-        bcdm_probabilities.update(X[i, :], Y[i, :])
-        bcdm_segments.update(X[i, :], Y[i, :])
+    # Update the segmentation hypotheses given the data.
+    for x, y in zip(X, Y):
+        bcdm_probabilities.update(x, y)
+        bcdm_segments.update(x, y)
 
     # Recover the hypothesis probabilities and back-trace to find the most
     # likely segmentation of the sequence.
