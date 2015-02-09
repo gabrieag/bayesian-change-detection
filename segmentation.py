@@ -220,11 +220,11 @@ class Bcdm():
                          to an executable hazard function. The hazard function
                          must accept non-negative integers and return
                          non-negative floating-point numbers.
-        basisfun (callable): Feature functions for basis function
-                             expansion. Feature functions provide additional
-                             flexibility by mapping the predictor variables to
-                             an intermmediate feature space, thus allowing the
-                             user to model non-linear relationships.
+        basisfunc (callable): Feature functions for basis function
+                              expansion. Feature functions provide additional
+                              flexibility by mapping the predictor variables to
+                              an intermmediate feature space, thus allowing the
+                              user to model non-linear relationships.
         minprob (float): Minimum probability required for a
                          hypothesis. Hypotheses with insignificant support
                          (probabilities below this value) will be pruned.
@@ -241,7 +241,7 @@ class Bcdm():
     """
 
     def __init__(self, mu=None, omega=None, sigma=None, eta=None,
-                 alg='sumprod', ratefun=0.1, basisfun=None, minprob=1.0e-6,
+                 alg='sumprod', ratefun=0.1, basisfunc=None, minprob=1.0e-6,
                  maxhypot=20):
 
         # The inference algorithm must be either sum-product or sum-product.
@@ -300,7 +300,8 @@ class Bcdm():
         self.__counts = list()
         self.__probabilities = list()
 
-        self.__basisfun = basisfun if callable(basisfun) else lambda x: x
+        # Store basis and hazard function.
+        self.__basisfunc = basisfunc if callable(basisfunc) else lambda x: x
         self.__ratefun = ratefun if callable(ratefun) else lambda x: ratefun
 
     def __initialise_algorithm(self, m, n):
@@ -336,42 +337,35 @@ class Bcdm():
         if self.__eta is None:
             self.__eta = n
 
+        # Create the initial hypothesis, which states that the first segment is
+        # about to begin.
+        self.__add_new_hypothesis(0.0)
+
+    def __soft_max(self, x, y):
+        return max(x, y) + np.log1p(np.exp(-abs(x - y)))
+
+    def __add_new_hypothesis(self, log_likelihood, basisfunc=None):
+        """Function for spawning new hypothesis"""
+
+        # Set basis function.
+        if basisfunc is None:
+            basisfunc = self.__basisfunc
+
+        # Create new Bayesian linear model (using supplied priors).
         stat = MatrixVariateNormalInvGamma(self.__mu,
                                            self.__omega,
                                            self.__sigma,
                                            self.__eta)
 
-        # Create the initial hypothesis, which states that the first segment is
-        # about to begin.
-        self.__update_count = 0
-        self.__hypotheses = [{'index': 0,
-                              'count': 0,
-                              'log_probability': 0.0,
-                              'distribution': stat,
-                              'log_constant': stat.log_constant()}]
+        # Add a new hypothesis, which states that a new segment is about to
+        # begin.
+        self.__hypotheses.append({'count': 0,
+                                  'log_probability': log_likelihood,
+                                  'distribution': stat,
+                                  'log_constant': stat.log_constant(),
+                                  'basisfunc': basisfunc})
 
-    def __soft_max(self, x, y):
-        return max(x, y) + np.log1p(np.exp(-abs(x - y)))
-
-    def block_update(self, X, Y):
-        """Update model with multiple observations.
-
-        This method is a convenience method for updating the model when many
-        new input-output data are available. This method simply iterates over
-        the inputs calling :py:meth:`.update`.
-
-        Args:
-            X (numpy.array): Observed (K x M) input data (predictor variable).
-            Y (numpy.array): Observed (K x N) output data (response variable).
-
-        """
-
-        # Iterate through the rows of the input-output data updating the
-        # hypotheses in the model.
-        for i in range(X.shape[0]):
-            self.update(X[i, :], Y[i, :])
-
-    def update(self, X, Y):
+    def update(self, X, Y, basisfunc=None):
         """Update model with a single observation.
 
         When new input-output data is available, the model can be updated using
@@ -406,13 +400,12 @@ class Bcdm():
         logsum = -np.inf
         ind = np.nan
 
-        # Update hypotheses by updating each maxtrix variate, normal inverse
+        # Update hypotheses by updating each matrix variate, normal inverse
         # gamma distribution over the linear models.
-        self.__update_count += 1
         for hypothesis in self.__hypotheses:
 
             # Update the sufficient statistics.
-            hypothesis['distribution'].update(self.__basisfun(X), Y)
+            hypothesis['distribution'].update(hypothesis['basisfunc'](X), Y)
 
             # Compute the log-normalization constant after the update
             # (posterior parameter distribution).
@@ -447,21 +440,12 @@ class Bcdm():
             loglik = logmax
             self.__counts.append(ind)
 
-        stat = MatrixVariateNormalInvGamma(self.__mu, self.__omega,
-                                           self.__sigma, self.__eta)
-
         # Add a new hypothesis, which states that the next segment is about to
         # begin.
-        self.__hypotheses.append({'index': self.__update_count,
-                                  'count': 0,
-                                  'log_probability': loglik,
-                                  'distribution': stat,
-                                  'log_constant': stat.log_constant()})
-
-        logsum = self.__soft_max(logsum, loglik)
-        self.logsum = logsum
+        self.__add_new_hypothesis(loglik, basisfunc)
 
         # Normalize the hypotheses so that their probabilities sum to one.
+        logsum = self.__soft_max(logsum, loglik)
         for hypothesis in self.__hypotheses:
             hypothesis['log_probability'] -= logsum
 
@@ -522,6 +506,24 @@ class Bcdm():
             logsum = self.__soft_max(logsum, hypot['log_probability'])
         for hypot in self.__hypotheses:
             hypot['log_probability'] -= logsum
+
+    def block_update(self, X, Y):
+        """Update model with multiple observations.
+
+        This method is a convenience method for updating the model when many
+        new input-output data are available. This method simply iterates over
+        the inputs calling :py:meth:`.update`.
+
+        Args:
+            X (numpy.array): Observed (K x M) input data (predictor variable).
+            Y (numpy.array): Observed (K x N) output data (response variable).
+
+        """
+
+        # Iterate through the rows of the input-output data updating the
+        # hypotheses in the model.
+        for i in range(X.shape[0]):
+            self.update(X[i, :], Y[i, :])
 
     def infer(self):
         """Return posterior probabilities OR sequence segmentation.

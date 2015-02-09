@@ -16,6 +16,9 @@ import matplotlib.pyplot as plt
 from segmentation import Bcdm
 from segmentation import MatrixVariateNormalInvGamma
 
+# Use same random data for repeatability.
+np.random.seed(seed=1729)
+
 
 def random_segments(m, n, k, l, mu=None, omega=None, sigma=None, eta=None,
                     featfun=None):
@@ -189,6 +192,7 @@ def random_data():
 def non_sinusoidal():
 
     rate = 0.1
+    sigma = 1e-6*np.eye(3)
     samples = 1000
 
     # create non-sinusoidal waveform functions.
@@ -210,14 +214,18 @@ def non_sinusoidal():
     # Determine location of true boundaries.
     true_boundaries = np.hstack((np.pi * np.arange(0, 7),
                                  np.pi * np.arange(0, 6) + np.pi/2,
-                                 2 * np.pi * np.arange(0, 4) + np.pi - np.pi/3))
+                                 2*np.pi * np.arange(0, 4) + np.pi - np.pi/3))
 
     true_boundaries = np.sort(true_boundaries[true_boundaries <= max(X)])
 
     # Compute the posterior probabilities of the segmentation hypotheses. Then,
     # find the most likely segmentation of the sequence.
-    bcdm_probabilities = Bcdm(alg='sumprod', ratefun=rate)
-    bcdm_segments = Bcdm(alg='maxprod', ratefun=rate)
+    bcdm_probabilities = Bcdm(alg='sumprod',
+                              ratefun=rate,
+                              sigma=sigma)
+    bcdm_segments = Bcdm(alg='maxprod',
+                         ratefun=rate,
+                         sigma=sigma)
 
     # Update the segmentation hypotheses given the data.
     bcdm_probabilities.block_update(X, Y)
