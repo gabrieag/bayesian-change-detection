@@ -197,7 +197,7 @@ class MatrixVariateNormalInvGamma(object):
         return a, b
 
 
-class Bcdm():
+class Bcdm(object):
     """Bayesian change detection model.
 
     Args:
@@ -385,7 +385,9 @@ class Bcdm():
         # algorithm to configure itself to the size of the first input/output
         # data if no hyper-parameters have been specified.
         if not self.__initialised:
-            m = X.shape[1] if np.ndim(X) > 1 else X.size
+            init_basis = self.__basisfunc if basisfunc is None else basisfunc
+            x = init_basis(X)
+            m = x.shape[1] if np.ndim(x) > 1 else X.size
             n = Y.shape[1] if np.ndim(Y) > 1 else Y.size
             self.__initialise_algorithm(m, n)
             self.__initialised = True

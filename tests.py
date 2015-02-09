@@ -192,9 +192,11 @@ def random_data():
 
 def non_sinusoidal():
 
-    rate = 0.1
-    sigma = 1e-6*np.eye(3)
+    rate = 0.001
+    omega = 1.0e-3 * np.eye(2)
+    sigma = 1.0e-6 * np.eye(3)
     samples = 1000
+    basis = lambda x: np.array([[1.0, x]])
 
     # create non-sinusoidal waveform functions.
     square_wave = lambda x: np.sign(np.sin(x))
@@ -223,16 +225,22 @@ def non_sinusoidal():
     # find the most likely segmentation of the sequence.
     bcdm_probabilities = Bcdm(alg='sumprod',
                               ratefun=rate,
+                              basisfunc=basis,
+                              omega=omega,
                               sigma=sigma)
+
     bcdm_segments = Bcdm(alg='maxprod',
                          ratefun=rate,
+                         basisfunc=basis,
+                         omega=omega,
                          sigma=sigma)
 
     # Update the segmentation hypotheses given the data.
     for x, y in zip(X, Y):
-        basis = lambda xt: xt - x
-        bcdm_probabilities.update(x, y, basisfunc=basis)
-        bcdm_segments.update(x, y, basisfunc=basis)
+        y = np.array([y])
+        basis_t = lambda xt: basis(xt - x)
+        bcdm_probabilities.update(x, y, basisfunc=basis_t)
+        bcdm_segments.update(x, y, basisfunc=basis_t)
 
     # Recover the hypothesis probabilities and back-trace to find the most
     # likely segmentation of the sequence.
