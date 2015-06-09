@@ -87,8 +87,8 @@ class MatrixVariateNormalInvGamma(object):
         x = np.dot(omega, mu)
         self.__prod[:m, :m] = omega
         self.__prod[:m, m:] = x
-        self.__prod[m:, :m] = x.transpose()
-        self.__prod[m:, m:] = np.dot(np.transpose(mu), x) + eta * sigma
+        self.__prod[m:, :m] = x.T
+        self.__prod[m:, m:] = np.dot(mu.T, x) + eta * sigma
         self.__weight = eta
 
     def update(self, X, Y):
@@ -111,14 +111,14 @@ class MatrixVariateNormalInvGamma(object):
         #
         if np.ndim(X) > 1:
             k, m = np.shape(X)
-            x = np.dot(np.transpose(X), Y)
+            x = np.dot(X.T, Y)
 
             # Update the statistics given a block of data (in the following
             # order: XX, XY, YX, YY)
-            self.__prod[:m, :m] += np.dot(np.transpose(X), X)
+            self.__prod[:m, :m] += np.dot(X.T, X)
             self.__prod[:m, m:] += x
-            self.__prod[m:, :m] += x.transpose()
-            self.__prod[m:, m:] += np.dot(np.transpose(Y), Y)
+            self.__prod[m:, :m] += x.T
+            self.__prod[m:, m:] += np.dot(Y.T, Y)
             self.__weight += k
 
         else:
@@ -128,7 +128,7 @@ class MatrixVariateNormalInvGamma(object):
             # Update the statistics given a single datum.
             self.__prod[:m, :m] += np.outer(X, X)
             self.__prod[:m, m:] += x
-            self.__prod[m:, :m] += x.transpose()
+            self.__prod[m:, :m] += x.T
             self.__prod[m:, m:] += np.outer(Y, Y)
             self.__weight += 1
 
