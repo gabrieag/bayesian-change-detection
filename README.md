@@ -8,16 +8,19 @@ Sequence segmentation occurs online by recursively updating a set of segmentatio
 Installation
 ------------
 
-This module can be installed using `pip`. To download and install this module from the command line using `pip`, type the following commands into the console:
+This module can be installed using `pip`. To download and install this module from the command line, type the following commands in the console:
 ```
 git clone git@github.com:gabrieag/bayesian-change-detection.git
 cd bayesian-change-detection
 sudo pip install .
 ```
-To uninstall this module:
+To uninstall this module, type:
 ```
 sudo pip uninstall change_detec
 ```
 
 Examples
 --------
+To run the examples, run `examples.py` with the Python interpreter. This script runs a set of examples that demonstrate the Bayesian change detection model on different datasets. The output is a set of plots, one for each example. Each plot looks like this:
+
+![]()
