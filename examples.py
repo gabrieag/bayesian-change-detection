@@ -18,6 +18,11 @@ from numpy import random
 from numpy import linalg
 import matplotlib.pyplot as plt
 
+import csv
+
+import datetime
+from dateutil import parser as dp
+
 import logging
 
 from change_detec import Bcdm
@@ -375,6 +380,97 @@ def well_data():
     loweraxes.set_ylabel('Hypothesis probability')
 
 
+def index_data():
+    """Simple example with equity index return data
+
+    Segment the daily rates of return of a pair of equity indices between April
+    23rd, 1993 and July 14th, 2003. The indices are the Cotation Assistee en
+    Continu (CAC) and the Deutscher Aktienindex (DAX). The rates of return are
+    computed based on the daily closing price of each index.
+    """
+
+    # Store the absolute path to the file containing the data.
+    abspath = path.realpath(path.join(os.getcwd(), 'data'))
+    abspath = path.join(abspath, 'equity-index-data.csv')
+
+    time = []
+    val = []
+
+    # Read the data.
+    with open(abspath, 'r') as fileobj:
+        reader = csv.reader(fileobj, delimiter=',')
+        row = reader.next()
+        name = []
+        for field in row:
+            if field != 'date':
+                name.append(field.upper())
+        for row in reader:
+            rec = []
+            for field in row:
+                try:
+                    rec.append(float(field))
+                except:
+                    time.append(dp.parse(field))
+            val.append(rec)
+
+    # Format the data.
+    X = np.ones([len(val), 1])
+    Y = np.array(val).reshape([len(val), len(name)])
+
+    # Select daily returns from CAC and DAX.
+    ind = ['CAC', 'DAX']
+    ind = [name.index(i) for i in ind]
+    name = [name[i] for i in ind]
+    Y = Y[:, ind]
+
+    kwargs = {'ratefun': 1.0e-2,                   # 1% expected hazard rate
+              'mu': np.zeros([1, len(name)]),      # 0% expected rate of return
+              'sigma': 1.0e-4 * np.eye(len(name)), # 1% expected volatility
+              'maxhypot': 50,
+              'minprob': 1.0e-16}
+
+    # Compute the posterior probabilities over segment length hypotheses. Then,
+    # find the most likely sequence segmentation.
+    bcdm_probabilities = Bcdm(alg='sumprod', **kwargs)
+    bcdm_segments = Bcdm(alg='maxprod', **kwargs)
+
+    # Update the segment length hypotheses given the data.
+    for x, y in zip(X, Y):
+        bcdm_probabilities.update(x, y)
+        bcdm_segments.update(x, y)
+
+    # Recover the hypothesis probabilities and back-trace to find the most
+    # likely segmentation of the sequence.
+    hypotheses_probability = bcdm_probabilities.infer()
+    segments = bcdm_segments.infer()
+
+    # Create subplots with shared X-axis.
+    fig, (upperaxes, loweraxes) = plt.subplots(2, sharex=True)
+    fig.subplots_adjust(hspace=0)
+
+    # Plot the response data.
+    t = np.arange(1, len(val) + 1)
+    upperaxes.plot(t, Y[:])
+
+    # Plot the posterior probabilities over segment length hypotheses.
+    plot_probability(loweraxes, hypotheses_probability, cmap=plt.cm.gray)
+
+    # Plot the changes detected by the segmentation algorithm as alternating
+    # coloured spans. Plot the true segment boundaries as vertical lines.
+    for ax in (upperaxes, loweraxes):
+        plt.sca(ax)
+        plot_segment_span(t, segments, facecolor='y', alpha=0.2, edgecolor='none')
+        ax.set_xlim([0, len(val)])
+
+    fig.canvas.set_window_title('Equity index data')
+    upperaxes.set_title('Equity index data')
+    upperaxes.set_ylabel('Rate of return')
+    loweraxes.set_xlabel('Trading day')
+    loweraxes.set_ylabel('Hypothesis probability')
+
+    upperaxes.legend(['CAC', 'DAX'], loc='upper left')
+
+
 if __name__ == '__main__':
 
     # Create a basic console logger.
@@ -386,10 +482,12 @@ if __name__ == '__main__':
 
     # Run the examples.
     logger.info('Running random data example ...')
-    random_data()
+    #random_data()
     logger.info('Running triangular wave data example ...')
-    non_sinusoidal()
+    #non_sinusoidal()
     logger.info('Running well log data example ...')
-    well_data()
+    #well_data()
+    logger.info('Running equity index data example ...')
+    index_data()
 
     plt.show()
