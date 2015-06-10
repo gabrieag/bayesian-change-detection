@@ -482,11 +482,11 @@ if __name__ == '__main__':
 
     # Run the examples.
     logger.info('Running random data example ...')
-    #random_data()
+    random_data()
     logger.info('Running triangular wave data example ...')
-    #non_sinusoidal()
+    non_sinusoidal()
     logger.info('Running well log data example ...')
-    #well_data()
+    well_data()
     logger.info('Running equity index data example ...')
     index_data()
 
