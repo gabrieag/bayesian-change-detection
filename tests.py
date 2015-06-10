@@ -15,8 +15,8 @@ import matplotlib.pyplot as plt
 
 import logging
 
-from segmentation import Bcdm
-from segmentation import MatrixVariateNormalInvGamma
+from change_detec import Bcdm
+from change_detec import MatrixVariateNormalInvGamma
 
 # Use same random data for repeatability.
 np.random.seed(seed=1729)
@@ -95,7 +95,7 @@ def plot_probability(axes, prob, scale=None, **arg):
     ind, = np.nonzero(prob.max(axis=1) > 0)
     j = ind.max()
 
-    # Plot the posterior probabilities of the segmentation hypotheses.
+    # Plot the posterior probabilities over segment length hypotheses.
     axes.imshow(1.0 - prob[:j+1],
                 origin='lower',
                 aspect='auto',
@@ -155,12 +155,12 @@ def random_data():
 
     rate = float(numseg) / float(numpoint - numseg)
 
-    # Compute the posterior probabilities of the segmentation hypotheses. Then,
+    # Compute the posterior probabilities over segment length hypotheses. Then,
     # find the most likely segmentation of the sequence.
     bcdm_probabilities = Bcdm(alg='sumprod', ratefun=rate)
     bcdm_segments = Bcdm(alg='maxprod', ratefun=rate)
 
-    # Update the segmentation hypotheses given the data.
+    # Update the segment length hypotheses given the data.
     for x, y in zip(X, Y):
         bcdm_probabilities.update(x, y)
         bcdm_segments.update(x, y)
@@ -179,7 +179,7 @@ def random_data():
     for i in range(numresp):
         upperaxes.plot(t, Y[:, i])
 
-    # Plot the posterior probabilities of the segmentation hypotheses.
+    # Plot the posterior probabilities over segment length hypotheses.
     plot_probability(loweraxes, hypotheses_probability, cmap=plt.cm.gray)
 
     # Plot the changes detected by the segmentation algorithm as alternating
@@ -229,7 +229,7 @@ def non_sinusoidal():
 
     true_boundaries = np.sort(true_boundaries[true_boundaries <= max(X)])
 
-    # Compute the posterior probabilities of the segmentation hypotheses. Then,
+    # Compute the posterior probabilities over segment length hypotheses. Then,
     # find the most likely segmentation of the sequence.
     bcdm_probabilities = Bcdm(alg='sumprod',
                               ratefun=rate,
@@ -243,7 +243,7 @@ def non_sinusoidal():
                          omega=omega,
                          sigma=sigma)
 
-    # Update the segmentation hypotheses given the data.
+    # Update the segment length hypotheses given the data.
     for x, y in zip(X, Y):
         y = np.array([y])
         basis_t = lambda xt: basis(xt - x)
@@ -262,7 +262,7 @@ def non_sinusoidal():
     for i in range(Y.shape[1]):
         upperaxes.plot(X, Y[:, i])
 
-    # Plot the posterior probabilities of the segmentation hypotheses.
+    # Plot the posterior probabilities over segment length hypotheses.
     plot_probability(loweraxes, hypotheses_probability, cmap=plt.cm.gray)
 
     # Plot the changes detected by the segmentation algorithm as alternating
@@ -331,12 +331,12 @@ def well_data():
               'mu': loc,
               'sigma': scale}
 
-    # Compute the posterior probabilities of the segmentation hypotheses. Then,
+    # Compute the posterior probabilities over segment length hypotheses. Then,
     # find the most likely sequence segmentation.
     bcdm_probabilities = Bcdm(alg='sumprod', **kwargs)
     bcdm_segments = Bcdm(alg='maxprod', **kwargs)
 
-    # Update the segmentation hypotheses given the data.
+    # Update the segment length hypotheses given the data.
     for x, y in zip(X, Y):
         bcdm_probabilities.update(x, y)
         bcdm_segments.update(x, y)
@@ -354,7 +354,7 @@ def well_data():
     t = np.arange(1, len(val) + 1)
     upperaxes.plot(t, Y[:])
 
-    # Plot the posterior probabilities of the segmentation hypotheses.
+    # Plot the posterior probabilities over segment length hypotheses.
     plot_probability(loweraxes, hypotheses_probability, cmap=plt.cm.gray)
 
     # Plot the changes detected by the segmentation algorithm as alternating
@@ -383,7 +383,7 @@ if __name__ == '__main__':
     logger.info('Running random data test ...')
     random_data()
 
-    logger.info('Running triangle wave data test ...')
+    logger.info('Running triangular wave data test ...')
     non_sinusoidal()
 
     logger.info('Running well log data test ...')
