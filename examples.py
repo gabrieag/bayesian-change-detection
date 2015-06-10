@@ -1,5 +1,10 @@
 #!/usr/bin/python
-"""Demonstrate Bayesian change-point detection model.
+
+"""Examples of the Bayesian model-based change detection model in action
+
+This script runs a set of examples that demonstrate the Bayesian change
+detection model on different datasets. Some of these datasets are synthetic,
+while others are real.
 
 .. codeauthor:: Gabriel Agamennoni <gabriel.agamennoni@mavt.ethz.ch>
 .. codeauthor:: Asher Bender <a.bender@acfr.usyd.edu.au>
@@ -135,11 +140,11 @@ def plot_segment_models(x, segments, basisfun=None, **args):
 
 
 def random_data():
-    """Simple test with synthetic data."""
+    """Simple example with synthetic data."""
 
     # Set the size of the problem.
     numpred = 2
-    numresp = 3
+    numresp = 2
     numpoint = 200
     numseg = 5
 
@@ -190,15 +195,15 @@ def random_data():
         plot_segment_boundaries(t, segbound, color='k', linestyle=':')
         ax.set_xlim([0, numpoint])
 
-    fig.canvas.set_window_title('Random data')
-    upperaxes.set_title('Random data')
-    upperaxes.set_ylabel('Response')
-    loweraxes.set_xlabel('Sequence number')
+    fig.canvas.set_window_title('Randomly generated data')
+    upperaxes.set_title('Randomly generated data')
+    upperaxes.set_ylabel('Output values')
+    loweraxes.set_xlabel('Observation')
     loweraxes.set_ylabel('Hypothesis probability')
 
 
 def non_sinusoidal():
-    """Simple test with triangular wave data."""
+    """Simple example with triangular wave data."""
 
     rate = 0.001
     omega = 1.0e-3 * np.eye(2)
@@ -206,7 +211,7 @@ def non_sinusoidal():
     samples = 1000
     basis = lambda x: np.array([[1.0, x]])
 
-    # create non-sinusoidal waveform functions.
+    # Create triangulare wave functions.
     square_wave = lambda x: np.sign(np.sin(x))
     sawtooth_wave = lambda a, x: 2 * ((x/a) - np.floor(0.5 + (x/a)))
     triangle_wave = lambda a, x: 2 * np.abs(sawtooth_wave(a, x)) - 1
@@ -279,16 +284,15 @@ def non_sinusoidal():
     upperaxes.set_xlim([0, max(X)])
     loweraxes.set_xlim([0, len(X)])
 
-    fig.canvas.set_window_title('Non-sinusoidal data')
-    upperaxes.set_title('Non-sinusoidal data')
-    upperaxes.set_ylabel('Response')
-    upperaxes.set_xlabel('Predictor')
-    loweraxes.set_xlabel('Sequence number')
+    fig.canvas.set_window_title('Triangular wave data')
+    upperaxes.set_title('Triangular wave data')
+    upperaxes.set_ylabel('Signal values')
+    loweraxes.set_xlabel('Observation')
     loweraxes.set_ylabel('Hypothesis probability')
 
 
 def well_data():
-    """Simple test with nuclear response data collected the drilling of a well
+    """Simple example with nuclear response data collected a well drilling
 
     Segment the well log data used in Fearnhead and Clifford (1996). This data
     consist of measurements of the nuclear magnetic response of underground
@@ -364,29 +368,28 @@ def well_data():
         plot_segment_span(t, segments, facecolor='y', alpha=0.2, edgecolor='none')
         ax.set_xlim([0, len(val)])
 
-    fig.canvas.set_window_title('Drilling data')
-    upperaxes.set_title('Drilling data')
-    upperaxes.set_ylabel('Nuclear response')
+    fig.canvas.set_window_title('Well log data')
+    upperaxes.set_title('Well log data')
+    upperaxes.set_ylabel('Nuclear magnetic response')
     loweraxes.set_xlabel('Measurement number')
     loweraxes.set_ylabel('Hypothesis probability')
 
 
 if __name__ == '__main__':
 
-    # Create console logger.
+    # Create a basic console logger.
     logger = logging.getLogger()
     logger.setLevel(logging.DEBUG)
     handler = logging.StreamHandler()
     handler.setLevel(logging.DEBUG)
     logger.addHandler(handler)
 
-    logger.info('Running random data test ...')
+    # Run the examples.
+    logger.info('Running random data example ...')
     random_data()
-
-    logger.info('Running triangular wave data test ...')
+    logger.info('Running triangular wave data example ...')
     non_sinusoidal()
-
-    logger.info('Running well log data test ...')
+    logger.info('Running well log data example ...')
     well_data()
 
     plt.show()
