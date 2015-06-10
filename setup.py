@@ -1,3 +1,5 @@
+#!/usr/bin/python
+
 from setuptools import setup
 
 setup(
@@ -7,7 +9,5 @@ setup(
     author_email='g.agamennoni@gmail.com',
     description=('Bayesian change detection for input-output sequence data.'),
     py_modules=['change_detec'],
-    install_requires=[
-        'numpy',
-    ]
+    install_requires=['numpy']
 )
