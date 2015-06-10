@@ -22,7 +22,8 @@ np.random.seed(seed=1729)
 
 def random_segments(m, n, k, l, mu=None, omega=None, sigma=None, eta=None,
                     featfun=None):
-    """Generate random segmented multi-variate linear model data."""
+    """Generate multi-variate input-output data for the linear model, with 
+    randomly chosen segments."""
 
     # Set default prior for the location parameter.
     if mu is None:
@@ -289,7 +290,7 @@ def well_data():
     val = []
 
     # Store the absolute path to the file containing the data.
-    abspath = path.realpath(path.join(os.getcwd(), path.dirname(__file__)))
+    abspath = path.realpath(path.join(os.getcwd(), 'data'))
     abspath = path.join(abspath, 'well-data.txt')
 
     # Read the data.
