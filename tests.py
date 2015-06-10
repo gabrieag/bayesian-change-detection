@@ -13,6 +13,8 @@ from numpy import random
 from numpy import linalg
 import matplotlib.pyplot as plt
 
+import logging
+
 from segmentation import Bcdm
 from segmentation import MatrixVariateNormalInvGamma
 
@@ -20,10 +22,14 @@ from segmentation import MatrixVariateNormalInvGamma
 np.random.seed(seed=1729)
 
 
-def random_segments(m, n, k, l, mu=None, omega=None, sigma=None, eta=None,
+def gen_random_data(m, n, k, l, mu=None, omega=None, sigma=None, eta=None,
                     featfun=None):
-    """Generate multi-variate input-output data for the linear model, with 
-    randomly chosen segments."""
+    """Randomly generate multi-variate input-output data
+
+    First, generate a sequence of segments at random. Then, for each segment,
+    generate a random coefficient matrix and a random noise covariance matrix,
+    and use these to generate input-output data.
+    """
 
     # Set default prior for the location parameter.
     if mu is None:
@@ -59,14 +65,14 @@ def random_segments(m, n, k, l, mu=None, omega=None, sigma=None, eta=None,
         x = random.rand(k, m)
         y = np.zeros((k, n))
 
-        # Generate the gain and noise parameters.
-        gain, noise = MatrixVariateNormalInvGamma(mu, omega, sigma, eta).rand()
+        # Generate the coefficient matrix and the noise covariance matrix.
+        coeff, noise = MatrixVariateNormalInvGamma(mu, omega, sigma, eta).rand()
         fact = linalg.cholesky(noise).transpose()
 
         # Given a set of predictor data, generate a corresponding set of
         # response data.
         for j in range(k):
-            y[j, :] = featfun(np.dot(x[j, :], gain))
+            y[j, :] = featfun(np.dot(x[j, :], coeff))
             y[j, :] += np.dot(random.randn(n), fact)
 
         X.append(x)
@@ -80,7 +86,7 @@ def random_segments(m, n, k, l, mu=None, omega=None, sigma=None, eta=None,
 
 
 def plot_probability(axes, prob, scale=None, **arg):
-    """Plot hypotheses probability as a raster."""
+    """Plot hypotheses probabilities as a raster image."""
 
     if scale is None:
         scale = lambda x: x
@@ -138,13 +144,13 @@ def random_data():
     numseg = 5
 
     # Set parameters for generating the data.
-    gainparam = 0.5
+    coeffparam = 0.5
     noiseparam = 5.0
 
     # Generate a sequence of segments and, for each segment, generate a set of
     # predictor-response data.
-    segbound, X, Y = random_segments(numpred, numresp, numpoint, numseg,
-                                     omega=gainparam*np.eye(numpred),
+    segbound, X, Y = gen_random_data(numpred, numresp, numpoint, numseg,
+                                     omega=coeffparam*np.eye(numpred),
                                      eta=noiseparam)
 
     rate = float(numseg) / float(numpoint - numseg)
@@ -192,6 +198,7 @@ def random_data():
 
 
 def non_sinusoidal():
+    """Simple test with triangular wave data."""
 
     rate = 0.001
     omega = 1.0e-3 * np.eye(2)
@@ -281,7 +288,19 @@ def non_sinusoidal():
 
 
 def well_data():
-    """Nuclear response data collected during the drilling of a well."""
+    """Simple test with nuclear response data collected the drilling of a well
+
+    Segment the well log data used in Fearnhead and Clifford (1996). This data
+    consist of measurements of the nuclear magnetic response of underground
+    rocks, collected during the drilling of a well bore. The data are composed
+    of piecewise constant segments, each segment relating to a stratum with a
+    single type of rock. The jump discontinuities between segments occur at the
+    boundaries between rock strata.
+
+    P. Fearnhead and P. Clifford, "Online Inference for Hidden Markov Models
+    via Particle Filters," Journal of the Royal Statistical Society: Series B
+    (Statistical Methodology), Vol. 65, Issue 4, pp. 887-889, November 2003.
+    """
 
     loc = 1.0e5
     scale = 1.0e4
@@ -354,7 +373,20 @@ def well_data():
 
 if __name__ == '__main__':
 
+    # Create console logger.
+    logger = logging.getLogger()
+    logger.setLevel(logging.DEBUG)
+    handler = logging.StreamHandler()
+    handler.setLevel(logging.DEBUG)
+    logger.addHandler(handler)
+
+    logger.info('Running random data test ...')
     random_data()
+
+    logger.info('Running triangle wave data test ...')
     non_sinusoidal()
+
+    logger.info('Running well log data test ...')
     well_data()
+
     plt.show()
