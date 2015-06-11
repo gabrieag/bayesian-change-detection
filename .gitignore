@@ -1,11 +1,14 @@
-# Ignore python byte code.
+# Python byte code.
 *.pyc
 *~
 
-# Ignore editor configurations.
+# Editor configurations.
 .project
 .pydevproject
 
-# WingWare IDE
+# Mac attribute files.
+.DS_Store
+
+# WingWare IDE files.
 *.wpr
 *.wpu

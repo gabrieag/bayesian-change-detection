@@ -1,4 +1,6 @@
-"""Segment time sequence data.
+#!/usr/bin/python
+
+"""Bayesian model-based change detection for input-output sequence data
 
 The Bayesian change-point detection model (BCDM) class implements a recursive
 algorithm for partitioning a sequence of real-valued input-output data into

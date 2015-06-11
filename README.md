@@ -21,6 +21,5 @@ sudo pip uninstall change_detec
 
 Examples
 --------
-To run the examples, run `examples.py` with the Python interpreter. This script runs a set of examples that demonstrate the Bayesian change detection model on different datasets. The output is a set of plots, one for each example. Each plot looks like this:
-
-![]()
+To run the examples, run `examples.py` with the Python interpreter. This script runs a set of examples that demonstrate the Bayesian change detection model on different datasets. The output is a set of plots, one for each example. Each of the plots looks like this:
+![](https://raw.githubusercontent.com/gabrieag/bayesian-change-detection/code-restructure/images/well-log-data.png)

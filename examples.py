@@ -1,5 +1,10 @@
 #!/usr/bin/python
-"""Demonstrate Bayesian change-point detection model.
+
+"""Examples of the Bayesian model-based change detection model in action
+
+This script runs a set of examples that demonstrate the Bayesian change
+detection model on different datasets. Some of these datasets are synthetic,
+while others are real.
 
 .. codeauthor:: Gabriel Agamennoni <gabriel.agamennoni@mavt.ethz.ch>
 .. codeauthor:: Asher Bender <a.bender@acfr.usyd.edu.au>
@@ -13,16 +18,28 @@ from numpy import random
 from numpy import linalg
 import matplotlib.pyplot as plt
 
-from segmentation import Bcdm
-from segmentation import MatrixVariateNormalInvGamma
+import csv
+
+import datetime
+from dateutil import parser as dp
+
+import logging
+
+from change_detec import Bcdm
+from change_detec import MatrixVariateNormalInvGamma
 
 # Use same random data for repeatability.
 np.random.seed(seed=1729)
 
 
-def random_segments(m, n, k, l, mu=None, omega=None, sigma=None, eta=None,
+def gen_random_data(m, n, k, l, mu=None, omega=None, sigma=None, eta=None,
                     featfun=None):
-    """Generate random segmented multi-variate linear model data."""
+    """Randomly generate multi-variate input-output data
+
+    First, generate a sequence of segments at random. Then, for each segment,
+    generate a random coefficient matrix and a random noise covariance matrix,
+    and use these to generate input-output data.
+    """
 
     # Set default prior for the location parameter.
     if mu is None:
@@ -58,14 +75,14 @@ def random_segments(m, n, k, l, mu=None, omega=None, sigma=None, eta=None,
         x = random.rand(k, m)
         y = np.zeros((k, n))
 
-        # Generate the gain and noise parameters.
-        gain, noise = MatrixVariateNormalInvGamma(mu, omega, sigma, eta).rand()
+        # Generate the coefficient matrix and the noise covariance matrix.
+        coeff, noise = MatrixVariateNormalInvGamma(mu, omega, sigma, eta).rand()
         fact = linalg.cholesky(noise).transpose()
 
         # Given a set of predictor data, generate a corresponding set of
         # response data.
         for j in range(k):
-            y[j, :] = featfun(np.dot(x[j, :], gain))
+            y[j, :] = featfun(np.dot(x[j, :], coeff))
             y[j, :] += np.dot(random.randn(n), fact)
 
         X.append(x)
@@ -79,7 +96,7 @@ def random_segments(m, n, k, l, mu=None, omega=None, sigma=None, eta=None,
 
 
 def plot_probability(axes, prob, scale=None, **arg):
-    """Plot hypotheses probability as a raster."""
+    """Plot hypotheses probabilities as a raster image."""
 
     if scale is None:
         scale = lambda x: x
@@ -88,7 +105,7 @@ def plot_probability(axes, prob, scale=None, **arg):
     ind, = np.nonzero(prob.max(axis=1) > 0)
     j = ind.max()
 
-    # Plot the posterior probabilities of the segmentation hypotheses.
+    # Plot the posterior probabilities over segment length hypotheses.
     axes.imshow(1.0 - prob[:j+1],
                 origin='lower',
                 aspect='auto',
@@ -128,32 +145,32 @@ def plot_segment_models(x, segments, basisfun=None, **args):
 
 
 def random_data():
-    """Simple test with synthetic data."""
+    """Simple example with synthetic data."""
 
     # Set the size of the problem.
     numpred = 2
-    numresp = 3
+    numresp = 2
     numpoint = 200
     numseg = 5
 
     # Set parameters for generating the data.
-    gainparam = 0.5
+    coeffparam = 0.5
     noiseparam = 5.0
 
     # Generate a sequence of segments and, for each segment, generate a set of
     # predictor-response data.
-    segbound, X, Y = random_segments(numpred, numresp, numpoint, numseg,
-                                     omega=gainparam*np.eye(numpred),
+    segbound, X, Y = gen_random_data(numpred, numresp, numpoint, numseg,
+                                     omega=coeffparam*np.eye(numpred),
                                      eta=noiseparam)
 
     rate = float(numseg) / float(numpoint - numseg)
 
-    # Compute the posterior probabilities of the segmentation hypotheses. Then,
+    # Compute the posterior probabilities over segment length hypotheses. Then,
     # find the most likely segmentation of the sequence.
     bcdm_probabilities = Bcdm(alg='sumprod', ratefun=rate)
     bcdm_segments = Bcdm(alg='maxprod', ratefun=rate)
 
-    # Update the segmentation hypotheses given the data.
+    # Update the segment length hypotheses given the data.
     for x, y in zip(X, Y):
         bcdm_probabilities.update(x, y)
         bcdm_segments.update(x, y)
@@ -172,7 +189,7 @@ def random_data():
     for i in range(numresp):
         upperaxes.plot(t, Y[:, i])
 
-    # Plot the posterior probabilities of the segmentation hypotheses.
+    # Plot the posterior probabilities over segment length hypotheses.
     plot_probability(loweraxes, hypotheses_probability, cmap=plt.cm.gray)
 
     # Plot the changes detected by the segmentation algorithm as alternating
@@ -183,14 +200,15 @@ def random_data():
         plot_segment_boundaries(t, segbound, color='k', linestyle=':')
         ax.set_xlim([0, numpoint])
 
-    fig.canvas.set_window_title('Random data')
-    upperaxes.set_title('Random data')
-    upperaxes.set_ylabel('Response')
-    loweraxes.set_xlabel('Sequence number')
+    fig.canvas.set_window_title('Randomly generated data')
+    upperaxes.set_title('Randomly generated data')
+    upperaxes.set_ylabel('Output values')
+    loweraxes.set_xlabel('Observation')
     loweraxes.set_ylabel('Hypothesis probability')
 
 
 def non_sinusoidal():
+    """Simple example with triangular wave data."""
 
     rate = 0.001
     omega = 1.0e-3 * np.eye(2)
@@ -198,7 +216,7 @@ def non_sinusoidal():
     samples = 1000
     basis = lambda x: np.array([[1.0, x]])
 
-    # create non-sinusoidal waveform functions.
+    # Create triangulare wave functions.
     square_wave = lambda x: np.sign(np.sin(x))
     sawtooth_wave = lambda a, x: 2 * ((x/a) - np.floor(0.5 + (x/a)))
     triangle_wave = lambda a, x: 2 * np.abs(sawtooth_wave(a, x)) - 1
@@ -221,7 +239,7 @@ def non_sinusoidal():
 
     true_boundaries = np.sort(true_boundaries[true_boundaries <= max(X)])
 
-    # Compute the posterior probabilities of the segmentation hypotheses. Then,
+    # Compute the posterior probabilities over segment length hypotheses. Then,
     # find the most likely segmentation of the sequence.
     bcdm_probabilities = Bcdm(alg='sumprod',
                               ratefun=rate,
@@ -235,7 +253,7 @@ def non_sinusoidal():
                          omega=omega,
                          sigma=sigma)
 
-    # Update the segmentation hypotheses given the data.
+    # Update the segment length hypotheses given the data.
     for x, y in zip(X, Y):
         y = np.array([y])
         basis_t = lambda xt: basis(xt - x)
@@ -254,7 +272,7 @@ def non_sinusoidal():
     for i in range(Y.shape[1]):
         upperaxes.plot(X, Y[:, i])
 
-    # Plot the posterior probabilities of the segmentation hypotheses.
+    # Plot the posterior probabilities over segment length hypotheses.
     plot_probability(loweraxes, hypotheses_probability, cmap=plt.cm.gray)
 
     # Plot the changes detected by the segmentation algorithm as alternating
@@ -271,16 +289,27 @@ def non_sinusoidal():
     upperaxes.set_xlim([0, max(X)])
     loweraxes.set_xlim([0, len(X)])
 
-    fig.canvas.set_window_title('Non-sinusoidal data')
-    upperaxes.set_title('Non-sinusoidal data')
-    upperaxes.set_ylabel('Response')
-    upperaxes.set_xlabel('Predictor')
-    loweraxes.set_xlabel('Sequence number')
+    fig.canvas.set_window_title('Triangular wave data')
+    upperaxes.set_title('Triangular wave data')
+    upperaxes.set_ylabel('Signal values')
+    loweraxes.set_xlabel('Observation')
     loweraxes.set_ylabel('Hypothesis probability')
 
 
 def well_data():
-    """Nuclear response data collected during the drilling of a well."""
+    """Simple example with nuclear response data collected a well drilling
+
+    Segment the well log data used in Fearnhead and Clifford (1996). This data
+    consist of measurements of the nuclear magnetic response of underground
+    rocks, collected during the drilling of a well bore. The data are composed
+    of piecewise constant segments, each segment relating to a stratum with a
+    single type of rock. The jump discontinuities between segments occur at the
+    boundaries between rock strata.
+
+    P. Fearnhead and P. Clifford, "Online Inference for Hidden Markov Models
+    via Particle Filters," Journal of the Royal Statistical Society: Series B
+    (Statistical Methodology), Vol. 65, Issue 4, pp. 887-889, November 2003.
+    """
 
     loc = 1.0e5
     scale = 1.0e4
@@ -289,7 +318,7 @@ def well_data():
     val = []
 
     # Store the absolute path to the file containing the data.
-    abspath = path.realpath(path.join(os.getcwd(), path.dirname(__file__)))
+    abspath = path.realpath(path.join(os.getcwd(), 'data'))
     abspath = path.join(abspath, 'well-data.txt')
 
     # Read the data.
@@ -311,12 +340,12 @@ def well_data():
               'mu': loc,
               'sigma': scale}
 
-    # Compute the posterior probabilities of the segmentation hypotheses. Then,
+    # Compute the posterior probabilities over segment length hypotheses. Then,
     # find the most likely sequence segmentation.
     bcdm_probabilities = Bcdm(alg='sumprod', **kwargs)
     bcdm_segments = Bcdm(alg='maxprod', **kwargs)
 
-    # Update the segmentation hypotheses given the data.
+    # Update the segment length hypotheses given the data.
     for x, y in zip(X, Y):
         bcdm_probabilities.update(x, y)
         bcdm_segments.update(x, y)
@@ -334,7 +363,7 @@ def well_data():
     t = np.arange(1, len(val) + 1)
     upperaxes.plot(t, Y[:])
 
-    # Plot the posterior probabilities of the segmentation hypotheses.
+    # Plot the posterior probabilities over segment length hypotheses.
     plot_probability(loweraxes, hypotheses_probability, cmap=plt.cm.gray)
 
     # Plot the changes detected by the segmentation algorithm as alternating
@@ -344,16 +373,121 @@ def well_data():
         plot_segment_span(t, segments, facecolor='y', alpha=0.2, edgecolor='none')
         ax.set_xlim([0, len(val)])
 
-    fig.canvas.set_window_title('Drilling data')
-    upperaxes.set_title('Drilling data')
-    upperaxes.set_ylabel('Nuclear response')
+    fig.canvas.set_window_title('Well log data')
+    upperaxes.set_title('Well log data')
+    upperaxes.set_ylabel('Nuclear magnetic response')
     loweraxes.set_xlabel('Measurement number')
     loweraxes.set_ylabel('Hypothesis probability')
 
 
+def index_data():
+    """Simple example with equity index return data
+
+    Segment the daily rates of return of a pair of equity indices between April
+    23rd, 1993 and July 14th, 2003. The indices are the Cotation Assistee en
+    Continu (CAC) and the Deutscher Aktienindex (DAX). The rates of return are
+    computed based on the daily closing price of each index.
+    """
+
+    # Store the absolute path to the file containing the data.
+    abspath = path.realpath(path.join(os.getcwd(), 'data'))
+    abspath = path.join(abspath, 'equity-index-data.csv')
+
+    time = []
+    val = []
+
+    # Read the data.
+    with open(abspath, 'r') as fileobj:
+        reader = csv.reader(fileobj, delimiter=',')
+        row = reader.next()
+        name = []
+        for field in row:
+            if field != 'date':
+                name.append(field.upper())
+        for row in reader:
+            rec = []
+            for field in row:
+                try:
+                    rec.append(float(field))
+                except:
+                    time.append(dp.parse(field))
+            val.append(rec)
+
+    # Format the data.
+    X = np.ones([len(val), 1])
+    Y = np.array(val).reshape([len(val), len(name)])
+
+    # Select daily returns from CAC and DAX.
+    ind = ['CAC', 'DAX']
+    ind = [name.index(i) for i in ind]
+    name = [name[i] for i in ind]
+    Y = Y[:, ind]
+
+    kwargs = {'ratefun': 1.0e-2,                   # 1% expected hazard rate
+              'mu': np.zeros([1, len(name)]),      # 0% expected rate of return
+              'sigma': 1.0e-4 * np.eye(len(name)), # 1% expected volatility
+              'maxhypot': 50,
+              'minprob': 1.0e-16}
+
+    # Compute the posterior probabilities over segment length hypotheses. Then,
+    # find the most likely sequence segmentation.
+    bcdm_probabilities = Bcdm(alg='sumprod', **kwargs)
+    bcdm_segments = Bcdm(alg='maxprod', **kwargs)
+
+    # Update the segment length hypotheses given the data.
+    for x, y in zip(X, Y):
+        bcdm_probabilities.update(x, y)
+        bcdm_segments.update(x, y)
+
+    # Recover the hypothesis probabilities and back-trace to find the most
+    # likely segmentation of the sequence.
+    hypotheses_probability = bcdm_probabilities.infer()
+    segments = bcdm_segments.infer()
+
+    # Create subplots with shared X-axis.
+    fig, (upperaxes, loweraxes) = plt.subplots(2, sharex=True)
+    fig.subplots_adjust(hspace=0)
+
+    # Plot the response data.
+    t = np.arange(1, len(val) + 1)
+    upperaxes.plot(t, Y[:])
+
+    # Plot the posterior probabilities over segment length hypotheses.
+    plot_probability(loweraxes, hypotheses_probability, cmap=plt.cm.gray)
+
+    # Plot the changes detected by the segmentation algorithm as alternating
+    # coloured spans. Plot the true segment boundaries as vertical lines.
+    for ax in (upperaxes, loweraxes):
+        plt.sca(ax)
+        plot_segment_span(t, segments, facecolor='y', alpha=0.2, edgecolor='none')
+        ax.set_xlim([0, len(val)])
+
+    fig.canvas.set_window_title('Equity index data')
+    upperaxes.set_title('Equity index data')
+    upperaxes.set_ylabel('Rate of return')
+    loweraxes.set_xlabel('Trading day')
+    loweraxes.set_ylabel('Hypothesis probability')
+
+    upperaxes.legend(['CAC', 'DAX'], loc='upper left')
+
+
 if __name__ == '__main__':
 
+    # Create a basic console logger.
+    logger = logging.getLogger()
+    logger.setLevel(logging.DEBUG)
+    handler = logging.StreamHandler()
+    handler.setLevel(logging.DEBUG)
+    logger.addHandler(handler)
+
+    # Run the examples.
+    logger.info('Running random data example ...')
     random_data()
+    logger.info('Running triangular wave data example ...')
     non_sinusoidal()
+    logger.info('Running well log data example ...')
     well_data()
+    logger.info('Running equity index data example ...')
+    index_data()
+
     plt.show()
