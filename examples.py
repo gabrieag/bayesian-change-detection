@@ -419,9 +419,10 @@ def index_data():
 
     # Select daily returns from CAC and DAX.
     ind = ['CAC', 'DAX']
-    ind = [name.index(i) for i in ind]
-    name = [name[i] for i in ind]
-    Y = Y[:, ind]
+    if len(ind) > 0:
+        ind = [name.index(i) for i in ind]
+        name = [name[i] for i in ind]
+        Y = Y[:, ind]
 
     kwargs = {'ratefun': 1.0e-2,                   # 1% expected hazard rate
               'mu': np.zeros([1, len(name)]),      # 0% expected rate of return
@@ -468,7 +469,7 @@ def index_data():
     loweraxes.set_xlabel('Trading day')
     loweraxes.set_ylabel('Hypothesis probability')
 
-    upperaxes.legend(['CAC', 'DAX'], loc='upper left')
+    upperaxes.legend(name, loc='upper left')
 
 
 if __name__ == '__main__':
